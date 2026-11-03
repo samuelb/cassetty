@@ -11,7 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/nullhard/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 // --- library navigation ----------------------------------------------------

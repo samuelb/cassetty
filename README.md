@@ -3,11 +3,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nullhard/cassetty/releases/latest"><img src="https://img.shields.io/github/v/release/nullhard/cassetty?style=flat-square&labelColor=2a2630&color=e38b86&label=release" alt="latest release"></a>
+  <a href="https://github.com/samuelb/cassetty/releases/latest"><img src="https://img.shields.io/github/v/release/samuelb/cassetty?style=flat-square&labelColor=2a2630&color=e38b86&label=release" alt="latest release"></a>
   <img src="https://img.shields.io/badge/macOS%20%C2%B7%20Linux-amd64%20%C2%B7%20arm64-eaa978?style=flat-square&labelColor=2a2630" alt="macOS and Linux, amd64 and arm64">
-  <img src="https://img.shields.io/github/go-mod/go-version/nullhard/cassetty?style=flat-square&labelColor=2a2630&color=e8d08a" alt="Go version">
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/nullhard/cassetty?style=flat-square&labelColor=2a2630&color=a6c99a" alt="Apache 2.0 license"></a>
-  <a href="https://github.com/nullhard/cassetty/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nullhard/cassetty/ci.yml?branch=main&style=flat-square&labelColor=2a2630&color=8fb8d6&label=ci" alt="CI status"></a>
+  <img src="https://img.shields.io/github/go-mod/go-version/samuelb/cassetty?style=flat-square&labelColor=2a2630&color=e8d08a" alt="Go version">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/samuelb/cassetty?style=flat-square&labelColor=2a2630&color=a6c99a" alt="Apache 2.0 license"></a>
+  <a href="https://github.com/samuelb/cassetty/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/samuelb/cassetty/ci.yml?branch=main&style=flat-square&labelColor=2a2630&color=8fb8d6&label=ci" alt="CI status"></a>
 </p>
 
 <p align="center">
@@ -35,18 +35,18 @@ keyboard and mouse.
 ### Download
 
 Grab the archive for your machine from the
-[latest release](https://github.com/nullhard/cassetty/releases/latest), unpack
+[latest release](https://github.com/samuelb/cassetty/releases/latest), unpack
 it and put `cassetty` somewhere on your `PATH`:
 
 | | Apple Silicon · ARM64 | Intel · x86-64 |
 |---|---|---|
-| **macOS** | [cassetty_darwin_arm64.tar.gz](https://github.com/nullhard/cassetty/releases/latest/download/cassetty_darwin_arm64.tar.gz) | [cassetty_darwin_amd64.tar.gz](https://github.com/nullhard/cassetty/releases/latest/download/cassetty_darwin_amd64.tar.gz) |
-| **Linux** | [cassetty_linux_arm64.tar.gz](https://github.com/nullhard/cassetty/releases/latest/download/cassetty_linux_arm64.tar.gz) | [cassetty_linux_amd64.tar.gz](https://github.com/nullhard/cassetty/releases/latest/download/cassetty_linux_amd64.tar.gz) |
+| **macOS** | [cassetty_darwin_arm64.tar.gz](https://github.com/samuelb/cassetty/releases/latest/download/cassetty_darwin_arm64.tar.gz) | [cassetty_darwin_amd64.tar.gz](https://github.com/samuelb/cassetty/releases/latest/download/cassetty_darwin_amd64.tar.gz) |
+| **Linux** | [cassetty_linux_arm64.tar.gz](https://github.com/samuelb/cassetty/releases/latest/download/cassetty_linux_arm64.tar.gz) | [cassetty_linux_amd64.tar.gz](https://github.com/samuelb/cassetty/releases/latest/download/cassetty_linux_amd64.tar.gz) |
 
 Or pick the right one from a shell:
 
 ```sh
-curl -fsSL https://github.com/nullhard/cassetty/releases/latest/download/cassetty_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz | tar xz cassetty
+curl -fsSL https://github.com/samuelb/cassetty/releases/latest/download/cassetty_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz | tar xz cassetty
 sudo mv cassetty /usr/local/bin/
 ```
 
@@ -60,7 +60,7 @@ sudo mv cassetty /usr/local/bin/
 Requires Go 1.26 or newer.
 
 ```sh
-go install github.com/nullhard/cassetty@latest
+go install github.com/samuelb/cassetty@latest
 # or from a checkout
 go build -o cassetty . && ./cassetty ~/Music
 ```

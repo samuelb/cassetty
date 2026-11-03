@@ -9,7 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/nullhard/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 func names(m *Model) []string {

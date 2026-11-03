@@ -1,6 +1,6 @@
 // Skins, the platform's download key, the latest version and copy buttons.
 
-const REPO = "nullhard/cassetty";
+const REPO = "samuelb/cassetty";
 // The order `t` cycles through in cassetty, starting at its default.
 const SKINS = ["sunbleached", "silverface", "cyberdeck", "classic", "amber", "vfd", "synthwave"];
 

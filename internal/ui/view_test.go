@@ -11,8 +11,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone/v2"
 
-	"github.com/nullhard/cassetty/internal/audio"
-	"github.com/nullhard/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/audio"
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 func testRoot(t *testing.T) string {

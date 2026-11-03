@@ -17,14 +17,14 @@ body = """
 {% endfor %}\
 {% endfor %}
 {% if previous.version %}\
-**Full Changelog**: https://github.com/nullhard/cassetty/compare/{{ previous.version }}...{{ version }}
+**Full Changelog**: https://github.com/samuelb/cassetty/compare/{{ previous.version }}...{{ version }}
 {% endif %}\
 """
 footer = """
 ## Install
 
 ```sh
-curl -fsSL https://github.com/nullhard/cassetty/releases/latest/download/cassetty_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz | tar xz cassetty
+curl -fsSL https://github.com/samuelb/cassetty/releases/latest/download/cassetty_$(uname -s | tr A-Z a-z)_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz | tar xz cassetty
 sudo mv cassetty /usr/local/bin/
 ```
 

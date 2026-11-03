@@ -1,4 +1,4 @@
-module github.com/nullhard/cassetty
+module github.com/samuelb/cassetty
 
 go 1.26.0
 

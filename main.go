@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nullhard/cassetty/internal/audio"
-	"github.com/nullhard/cassetty/internal/config"
-	"github.com/nullhard/cassetty/internal/library"
-	"github.com/nullhard/cassetty/internal/nowplaying"
-	"github.com/nullhard/cassetty/internal/ui"
+	"github.com/samuelb/cassetty/internal/audio"
+	"github.com/samuelb/cassetty/internal/config"
+	"github.com/samuelb/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/nowplaying"
+	"github.com/samuelb/cassetty/internal/ui"
 )
 
 var version = "dev"

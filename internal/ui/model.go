@@ -16,12 +16,12 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/nullhard/cassetty/internal/audio"
-	"github.com/nullhard/cassetty/internal/config"
-	"github.com/nullhard/cassetty/internal/library"
-	"github.com/nullhard/cassetty/internal/nowplaying"
-	"github.com/nullhard/cassetty/internal/viz"
-	"github.com/nullhard/cassetty/internal/watch"
+	"github.com/samuelb/cassetty/internal/audio"
+	"github.com/samuelb/cassetty/internal/config"
+	"github.com/samuelb/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/nowplaying"
+	"github.com/samuelb/cassetty/internal/viz"
+	"github.com/samuelb/cassetty/internal/watch"
 )
 
 type playState int

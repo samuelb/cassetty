@@ -9,7 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/nullhard/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 // Keeping the shown folder up to date: the folder watcher reports changes,

@@ -3,7 +3,7 @@ package ui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/nullhard/cassetty/internal/nowplaying"
+	"github.com/samuelb/cassetty/internal/nowplaying"
 )
 
 // The system's media controls: media keys, headphone buttons and the Now

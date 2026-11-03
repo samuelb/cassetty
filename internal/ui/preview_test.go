@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nullhard/cassetty/internal/audio"
-	"github.com/nullhard/cassetty/internal/library"
+	"github.com/samuelb/cassetty/internal/audio"
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 // TestCassettePreview writes cassette renderings at several sizes and
