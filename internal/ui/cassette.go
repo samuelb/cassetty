@@ -58,9 +58,6 @@ const (
 	layerHub
 )
 
-// tapeBrand is printed on every cassette label, in memory of Nullsoft.
-const tapeBrand = "NULLHARD"
-
 // cassetteHeight picks the cassette size for the available terminal height.
 func cassetteHeight(termH int) int {
 	switch {
@@ -145,18 +142,13 @@ func (m *Model) renderCassette(w, h int) []string {
 		lines = append(lines, shellRow(lb.String(), lw, " ", " "))
 	}
 
-	// Label bottom: tape type, brand and running time. A narrow label
-	// leaves the brand out.
+	// Label bottom: tape type and running time.
 	{
 		var lb lineBuf
 		lb.add(labelMuted, "  "+truncate(m.tapeType(), lw/2))
 		right := m.tapeLength() + "  "
-		brand := tapeBrand + " "
-		if lb.w+1+len(brand)+len(right) > lw {
-			brand = ""
-		}
-		lb.padTo(label, lw-len(brand)-len([]rune(right)))
-		lb.add(labelMuted.Bold(true), brand).add(labelMuted, right)
+		lb.padTo(label, lw-len([]rune(right)))
+		lb.add(labelMuted, right)
 		lines = append(lines, shellRow(lb.String(), lw, " ", " "))
 	}
 
