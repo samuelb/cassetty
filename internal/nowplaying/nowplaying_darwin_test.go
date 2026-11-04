@@ -88,7 +88,7 @@ func TestSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Update(Info{Title: "Test Tone", Artist: "cassetty", Length: time.Minute, Position: 5 * time.Second, State: Paused})
+	s.Update(Info{Path: "/tmp/test-tone.wav", Title: "Test Tone", Artist: "cassetty", Length: time.Minute, Position: 5 * time.Second, State: Paused})
 	onMainWait(t, func() {
 		center := send(class("MPNowPlayingInfoCenter"), "defaultCenter")
 		info := send(center, "nowPlayingInfo")

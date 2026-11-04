@@ -725,6 +725,17 @@ func (m *Model) setVolume(v int) {
 	m.engine.SetVolume(float64(m.volume) / 100)
 }
 
+func (m *Model) setShuffle(on bool) {
+	m.shuffle = on
+	m.order = nil
+	m.setFlash("shuffle "+onOff(on), false)
+}
+
+func (m *Model) setRepeat(r repeatMode) {
+	m.repeat = r
+	m.setFlash("repeat "+repeatNames[r], false)
+}
+
 func (m *Model) toggleMute() {
 	m.muted = !m.muted
 	if m.muted {
@@ -1023,12 +1034,9 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	case key.Matches(msg, k.Mute):
 		m.toggleMute()
 	case key.Matches(msg, k.Shuffle):
-		m.shuffle = !m.shuffle
-		m.order = nil
-		m.setFlash("shuffle "+onOff(m.shuffle), false)
+		m.setShuffle(!m.shuffle)
 	case key.Matches(msg, k.Repeat):
-		m.repeat = (m.repeat + 1) % 3
-		m.setFlash("repeat "+repeatNames[m.repeat], false)
+		m.setRepeat((m.repeat + 1) % 3)
 	case key.Matches(msg, k.Theme):
 		m.setTheme(m.themeIdx + 1)
 		m.setFlash("theme: "+m.theme.Name, false)

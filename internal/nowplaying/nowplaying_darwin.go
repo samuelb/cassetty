@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -210,7 +209,7 @@ func (s *Session) register() {
 // every change of the player: only changes the system cannot work out by
 // itself are passed on.
 func (s *Session) Update(info Info) {
-	if s.tracker.update(info, time.Now()) {
+	if changed, _ := s.tracker.update(info, time.Now()); changed {
 		onMain(func() { publish(info) })
 	}
 }
@@ -237,7 +236,7 @@ const mpMediaTypeAudio uint = 1 // MPNowPlayingInfoMediaTypeAudio
 
 func publish(info Info) {
 	center := send(class("MPNowPlayingInfoCenter"), "defaultCenter")
-	if info == (Info{}) {
+	if info.Path == "" {
 		send(center, "setNowPlayingInfo:", objc.ID(0))
 		send(center, "setPlaybackState:", mpStopped)
 		return
@@ -279,8 +278,6 @@ func nsString(s string) objc.ID {
 	if s == "" {
 		return 0
 	}
-	// stringWithUTF8String: rejects invalid UTF-8 (file names may hold it)
-	// and stops at the first NUL.
-	s = strings.ReplaceAll(strings.ToValidUTF8(s, "�"), "\x00", "")
-	return send(class("NSString"), "stringWithUTF8String:", s)
+	// stringWithUTF8String: rejects invalid UTF-8 and stops at the first NUL.
+	return send(class("NSString"), "stringWithUTF8String:", text(s))
 }

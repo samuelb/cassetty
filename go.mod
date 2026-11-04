@@ -13,6 +13,7 @@ require (
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/ebitengine/oto/v3 v3.5.1
 	github.com/ebitengine/purego v0.11.2
+	github.com/godbus/dbus/v5 v5.2.4
 	github.com/gopxl/beep/v2 v2.1.1
 	github.com/lrstanley/bubblezone/v2 v2.0.0
 	github.com/lucasb-eyer/go-colorful v1.4.1

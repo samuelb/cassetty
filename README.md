@@ -124,6 +124,11 @@ Playing widget in Control Center, which shows the playing track and can seek
 in it. macOS sends them to the app that played last, so cassetty takes them
 over once it plays a track.
 
+On Linux cassetty is an [MPRIS](https://specifications.freedesktop.org/mpris-spec/latest/)
+player: the media keys, the media widgets of GNOME, KDE Plasma and other
+desktops, and `playerctl` show the playing track, seek in it, and set the
+volume, shuffle and repeat.
+
 ## Skins
 
 Press `t` to cycle, pass `-theme`, or set `theme` in the config.
@@ -172,7 +177,8 @@ go test ./...
 CASSETTY_TEST_MUSIC=~/Music go test ./internal/audio ./internal/ui -v
 # exercise the sound device (at zero volume)
 CASSETTY_TEST_DEVICE=1 go test ./internal/audio -run TestDevice
-# publish a track to the macOS Now Playing widget and withdraw it
+# publish a track to the macOS Now Playing widget and withdraw it (on Linux,
+# go test drives the MPRIS player on a private dbus-daemon of its own)
 CASSETTY_TEST_NOWPLAYING=1 go test ./internal/nowplaying -run TestSession
 # write cassette renderings to a file for eyeballing
 CASSETTY_PREVIEW=/tmp/cassette.ans go test ./internal/ui -run TestCassettePreview && cat /tmp/cassette.ans
@@ -182,8 +188,9 @@ Layout: `internal/audio` (decoding, the always-running deck streamer, oto
 output, sample tap), `internal/viz` (FFT spectrum and VU ballistics),
 `internal/library` (folder listing, natural sort, recursive collection,
 tags), `internal/watch` (watches the shown folder with one kqueue/inotify
-handle; no per-file descriptors), `internal/nowplaying` (media keys and the
-macOS Now Playing widget through MediaPlayer, via purego), `internal/ui`
+handle; no per-file descriptors), `internal/nowplaying` (media keys: the
+macOS Now Playing widget through MediaPlayer, via purego, and MPRIS over
+D-Bus elsewhere), `internal/ui`
 (Bubble Tea model; `cassette.go`, `lcd.go`, `controls.go`, `browser.go`
 render the parts, `live.go` keeps the shown folder current,
 `remote.go` answers the media keys), `internal/config`.
