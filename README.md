@@ -80,6 +80,10 @@ If [`ffmpeg`](https://ffmpeg.org) is on your `PATH`, cassetty also plays
 **M4A/AAC/ALAC, Opus, AIFF, WMA, APE, WavPack, MKA, AC3, CAF**, and Ogg files
 that hold Opus or FLAC. Tracks are resampled to 44.1 kHz.
 
+Playback is gapless: cassetty opens the next track while one plays and rolls
+straight on to it, so live albums and DJ mixes play without a pause between
+the tracks.
+
 ## Usage
 
 ```

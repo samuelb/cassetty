@@ -250,13 +250,14 @@ func (m *Model) handlePlaylistKey(msg tea.KeyPressMsg) tea.Cmd {
 	case key.Matches(msg, k.Open):
 		if m.plCursor < len(m.playlist) {
 			m.failures = 0
-			return m.load(m.playlist[m.plCursor], true)
+			return m.playTrack(m.playlist[m.plCursor], true)
 		}
 	case key.Matches(msg, k.Remove):
 		m.removeFromPlaylist(m.plCursor)
 	case key.Matches(msg, k.Clear):
 		if len(m.playlist) > 0 {
-			m.playlist, m.order = nil, nil
+			m.playlist = nil
+			m.resetOrder()
 			m.plCursor, m.plOffset = 0, 0
 			m.setFlash("playlist cleared", false)
 		}

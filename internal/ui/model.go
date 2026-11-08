@@ -108,6 +108,13 @@ type Model struct {
 	remaining bool
 	tape      bool // the tape sound is on
 
+	// the track opened ahead to follow cur without a gap
+	queue    queued
+	queueSeq int
+	// the shuffled order of the next round, drawn when asked for the track
+	// after the last one, see nextIndexFrom
+	nextOrder []int
+
 	// animation
 	tickID         int
 	lastTick       time.Time
@@ -273,6 +280,24 @@ type openedMsg struct {
 	autoplay bool
 }
 
+// queued is the track opened ahead of time so that the deck can roll on to
+// it without a gap when the loaded one ends.
+type queued struct {
+	track *Track
+	seq   int           // of the open request
+	src   *audio.Source // nil while opening or when it failed; the engine owns it
+	meta  library.Meta
+	gen   uint64
+}
+
+type queuedMsg struct {
+	seq   int
+	track *Track
+	src   *audio.Source
+	meta  library.Meta
+	err   error
+}
+
 type audioEventMsg audio.Event
 
 type metaMsg map[string]library.Meta
@@ -369,7 +394,12 @@ func (m *Model) animate(dt float64) {
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	defer m.syncNowPlaying()
+	_, cmd := m.update(msg)
+	m.syncNowPlaying()
+	return m, tea.Batch(cmd, m.queueNext())
+}
+
+func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -400,6 +430,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case openedMsg:
 		return m, m.applyOpened(msg)
 
+	case queuedMsg:
+		return m, m.applyQueued(msg)
+
 	case metaMsg:
 		for _, t := range m.playlist {
 			if md, ok := msg[t.Path]; ok && t.Meta == nil {
@@ -414,7 +447,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if msg.Err != nil {
 				m.setFlash("playback error: "+msg.Err.Error(), true)
 			}
-			cmds = append(cmds, m.trackEnded())
+			if msg.Next != 0 && msg.Next == m.queue.gen {
+				cmds = append(cmds, m.advance())
+			} else {
+				cmds = append(cmds, m.trackEnded())
+			}
 		}
 		return m, tea.Batch(cmds...)
 
@@ -489,6 +526,7 @@ func (m *Model) applyOpened(msg openedMsg) tea.Cmd {
 		m.failures++
 		if msg.autoplay && m.failures < len(m.playlist) {
 			if i := slices.Index(m.playlist, msg.track); i >= 0 {
+				m.turnOrder(i)
 				if n, ok := m.nextIndexFrom(i); ok {
 					return m.load(m.playlist[n], true)
 				}
@@ -496,21 +534,94 @@ func (m *Model) applyOpened(msg openedMsg) tea.Cmd {
 		}
 		return nil
 	}
-	m.failures = 0
-	t := msg.track
-	t.Meta, t.Length, t.Failed = &msg.meta, msg.src.Length, false
-	m.cur = t
-	m.currentIndex()
-	m.src = msg.src
-	m.meta = msg.meta
-	m.gen = m.engine.Start(msg.src, msg.autoplay)
-	m.pos, m.marquee = 0, 0
+	m.queue = queued{} // Start clears the engine's queue
+	m.install(msg.track, msg.src, msg.meta, m.engine.Start(msg.src, msg.autoplay))
 	if msg.autoplay {
 		m.state = statePlaying
 	} else {
 		m.state = stateStopped
 	}
 	return m.kickTick()
+}
+
+// install makes t, opened as src, the loaded track; gen is its generation
+// in the engine.
+func (m *Model) install(t *Track, src *audio.Source, meta library.Meta, gen uint64) {
+	t.Meta, t.Length, t.Failed = &meta, src.Length, false
+	m.failures = 0
+	m.cur, m.src, m.meta, m.gen = t, src, meta, gen
+	m.turnOrder(m.currentIndex())
+	m.pos, m.marquee = 0, 0
+}
+
+// advance makes the queued track, which the deck has rolled on to, the
+// loaded one. It keeps playing, or winding down after a pause.
+func (m *Model) advance() tea.Cmd {
+	q := m.queue
+	m.queue = queued{}
+	m.install(q.track, q.src, q.meta, q.gen)
+	return m.kickTick()
+}
+
+// playTrack loads t, straight from the queue when it is opened there.
+func (m *Model) playTrack(t *Track, autoplay bool) tea.Cmd {
+	if q := m.queue; q.track == t && q.src != nil {
+		m.queue = queued{}
+		m.loadSeq++ // supersedes a track still being opened
+		return m.applyOpened(openedMsg{seq: m.loadSeq, track: t, src: q.src, meta: q.meta, autoplay: autoplay})
+	}
+	return m.load(t, autoplay)
+}
+
+// queueNext keeps the track that follows the loaded one opened in the
+// engine's queue, so the deck rolls on to it without a gap. It runs after
+// every message and only acts when the next track changes.
+func (m *Model) queueNext() tea.Cmd {
+	if m.loading {
+		return nil // the track being opened clears the queue anyway
+	}
+	var want *Track
+	if m.cur != nil {
+		if m.repeat == repeatOne {
+			want = m.cur
+		} else if i, ok := m.nextIndex(); ok {
+			want = m.playlist[i]
+		}
+	}
+	if want == m.queue.track {
+		return nil
+	}
+	if m.queue.src != nil {
+		m.engine.Queue(nil)
+	}
+	m.queue = queued{}
+	if want == nil {
+		return nil
+	}
+	m.queueSeq++
+	seq := m.queueSeq
+	m.queue = queued{track: want, seq: seq}
+	return func() tea.Msg {
+		src, err := audio.Open(want.Path)
+		var meta library.Meta
+		if err == nil {
+			meta = library.ReadMeta(want.Path)
+		}
+		return queuedMsg{seq: seq, track: want, src: src, meta: meta, err: err}
+	}
+}
+
+func (m *Model) applyQueued(msg queuedMsg) tea.Cmd {
+	if msg.seq != m.queue.seq {
+		msg.src.Close() // the next track changed meanwhile
+		return nil
+	}
+	if msg.err != nil {
+		return nil // it is loaded the usual way when its turn comes, which reports the error
+	}
+	m.queue.src, m.queue.meta = msg.src, msg.meta
+	m.queue.gen = m.engine.Queue(msg.src)
+	return nil
 }
 
 func (m *Model) setState(s playState) tea.Cmd {
@@ -586,6 +697,7 @@ func (m *Model) eject() tea.Cmd {
 	}
 	m.engine.Eject()
 	m.src, m.cur = nil, nil
+	m.queue = queued{} // Eject clears the engine's queue
 	m.state = stateStopped
 	m.pos = 0
 	m.setFlash("tape ejected", false)
@@ -631,7 +743,7 @@ func (m *Model) trackEnded() tea.Cmd {
 		return m.setState(statePlaying)
 	}
 	if i, ok := m.nextIndex(); ok {
-		return m.load(m.playlist[i], play)
+		return m.playTrack(m.playlist[i], play)
 	}
 	cmd := m.setState(stateStopped)
 	m.seekTo(0)
@@ -645,7 +757,7 @@ func (m *Model) next() tea.Cmd {
 		m.setFlash("end of playlist", false)
 		return nil
 	}
-	return m.load(m.playlist[i], m.state == statePlaying || m.src == nil)
+	return m.playTrack(m.playlist[i], m.state == statePlaying || m.src == nil)
 }
 
 func (m *Model) prev() tea.Cmd {
@@ -661,7 +773,11 @@ func (m *Model) prev() tea.Cmd {
 	return m.load(m.playlist[i], m.state == statePlaying || m.src == nil)
 }
 
+// resetOrder drops the shuffled order, which is drawn anew when needed.
+func (m *Model) resetOrder() { m.order, m.nextOrder = nil, nil }
+
 func (m *Model) reshuffle() {
+	m.nextOrder = nil
 	m.order = rand.Perm(len(m.playlist))
 	if c := m.currentIndex(); c >= 0 {
 		i := slices.Index(m.order, c)
@@ -672,7 +788,9 @@ func (m *Model) reshuffle() {
 func (m *Model) nextIndex() (int, bool) { return m.nextIndexFrom(m.currentIndex()) }
 
 // nextIndexFrom returns the playlist index that follows index c, honouring
-// shuffle and repeat. c < 0 means no track of the playlist is loaded.
+// shuffle and repeat. c < 0 means no track of the playlist is loaded. Asking
+// again gives the same answer until the playlist, the modes or the loaded
+// track change, so the next track can be queued ahead of time.
 func (m *Model) nextIndexFrom(c int) (int, bool) {
 	n := len(m.playlist)
 	if n == 0 {
@@ -693,11 +811,15 @@ func (m *Model) nextIndexFrom(c int) (int, bool) {
 			return m.order[p+1], true
 		}
 		if m.repeat == repeatAll {
-			m.order = rand.Perm(n)
-			if n > 1 && m.order[0] == c {
-				m.order[0], m.order[n-1] = m.order[n-1], m.order[0]
+			// The next round, in a new order that takes over when its
+			// first track loads (see turnOrder).
+			if len(m.nextOrder) != n {
+				m.nextOrder = rand.Perm(n)
+				if n > 1 && m.nextOrder[0] == c {
+					m.nextOrder[0], m.nextOrder[n-1] = m.nextOrder[n-1], m.nextOrder[0]
+				}
 			}
-			return m.order[0], true
+			return m.nextOrder[0], true
 		}
 		return -1, false
 	}
@@ -708,6 +830,13 @@ func (m *Model) nextIndexFrom(c int) (int, bool) {
 		return 0, true
 	}
 	return -1, false
+}
+
+// turnOrder starts the next shuffled round when track i opens it.
+func (m *Model) turnOrder(i int) {
+	if i >= 0 && len(m.nextOrder) == len(m.playlist) && m.nextOrder[0] == i {
+		m.order, m.nextOrder = m.nextOrder, nil
+	}
 }
 
 func (m *Model) prevIndex() (int, bool) {
@@ -739,7 +868,7 @@ func (m *Model) setVolume(v int) {
 
 func (m *Model) setShuffle(on bool) {
 	m.shuffle = on
-	m.order = nil
+	m.resetOrder()
 	m.setFlash("shuffle "+onOff(on), false)
 }
 
@@ -795,7 +924,7 @@ func (m *Model) readMeta(tracks []*Track) tea.Cmd {
 // replacePlaylist swaps in a new playlist and starts playing track start.
 func (m *Model) replacePlaylist(tracks []*Track, start int) tea.Cmd {
 	m.playlist = tracks
-	m.order = nil
+	m.resetOrder()
 	m.curHint = -1
 	m.plCursor, m.plOffset = start, 0
 	m.failures = 0
@@ -807,7 +936,7 @@ func (m *Model) appendTracks(tracks []*Track) tea.Cmd {
 		return nil
 	}
 	m.playlist = append(m.playlist, tracks...)
-	m.order = nil
+	m.resetOrder()
 	cmds := []tea.Cmd{m.readMeta(tracks)}
 	if m.src == nil && !m.loading {
 		// An empty deck: insert the tape, ready to play.
@@ -875,7 +1004,7 @@ func (m *Model) removeFromPlaylist(i int) {
 		m.curHint = c - 1
 	}
 	m.playlist = slices.Delete(m.playlist, i, i+1)
-	m.order = nil
+	m.resetOrder()
 	m.plCursor = min(m.plCursor, max(0, len(m.playlist)-1))
 }
 
@@ -885,7 +1014,7 @@ func (m *Model) movePlaylist(i, d int) {
 		return
 	}
 	m.playlist[i], m.playlist[j] = m.playlist[j], m.playlist[i]
-	m.order = nil
+	m.resetOrder()
 	m.plCursor = j
 }
 

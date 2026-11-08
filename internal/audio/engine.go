@@ -14,7 +14,10 @@ import (
 // failed while streaming).
 type Event struct {
 	Gen uint64 // generation of the track that ended, see Engine.Start
-	Err error
+	// Next is the generation of the queued track the deck rolled on to
+	// without a gap, see Engine.Queue; 0 when the deck stopped.
+	Next uint64
+	Err  error
 }
 
 // idleSuspendDelay is how long the deck must have had nothing to play before
@@ -90,26 +93,30 @@ func (e *Engine) Close() {
 		e.player.Close()
 	}
 	e.deck.mu.Lock()
-	src := e.deck.src
+	src, next := e.deck.src, e.deck.next
 	e.deck.src, e.deck.stream = nil, nil
+	e.deck.next, e.deck.nextStream = nil, nil
 	e.deck.mu.Unlock()
 	src.Close()
+	next.Close()
 }
 
 // Events delivers end-of-track notifications.
 func (e *Engine) Events() <-chan Event { return e.events }
 
 // Start installs src as the current track, replacing (and closing) the
-// previous one. It returns the generation number of the new track, which is
-// carried by the matching end-of-track Event.
+// previous one and clearing the queue. It returns the generation number of
+// the new track, which is carried by the matching end-of-track Event.
 func (e *Engine) Start(src *Source, play bool) uint64 {
 	d := e.deck
 	d.mu.Lock()
-	old := d.src
-	d.gen++
+	old, queued := d.src, d.next
+	d.seq++
+	d.gen = d.seq
 	gen := d.gen
 	d.src = src
 	d.stream = wrapStream(src)
+	d.next, d.nextStream, d.nextGen = nil, nil, 0
 	d.setPlaying(play)
 	if !play {
 		d.tape.motor = 0 // a new tape does not wind down from where the old one was
@@ -121,25 +128,53 @@ func (e *Engine) Start(src *Source, play bool) uint64 {
 	}
 	d.mu.Unlock()
 	d.changed()
-	if old != nil && old != src {
+	if old != src {
+		old.Close()
+	}
+	if queued != src {
+		queued.Close()
+	}
+	return gen
+}
+
+// Queue sets src to follow the loaded track without a gap: when the loaded
+// track plays to its end, the deck rolls straight on to src, and the Event
+// for the track that ended carries the generation of src in Next. Queue
+// replaces (and closes) any track queued before, and nil clears the queue.
+// It returns the generation src will play as.
+func (e *Engine) Queue(src *Source) uint64 {
+	d := e.deck
+	d.mu.Lock()
+	old := d.next
+	d.next, d.nextStream, d.nextGen = src, wrapStream(src), 0
+	if src != nil {
+		d.seq++
+		d.nextGen = d.seq
+	}
+	gen := d.nextGen
+	d.mu.Unlock()
+	if old != src {
 		old.Close()
 	}
 	return gen
 }
 
-// Eject unloads the current track.
+// Eject unloads the current track and clears the queue.
 func (e *Engine) Eject() {
 	d := e.deck
 	d.mu.Lock()
-	old := d.src
-	d.gen++
+	old, queued := d.src, d.next
+	d.seq++
+	d.gen = d.seq
 	d.src, d.stream = nil, nil
+	d.next, d.nextStream, d.nextGen = nil, nil, 0
 	d.playing = false
 	d.tape.motor = 0
 	d.tape.reset()
 	d.mu.Unlock()
 	d.changed()
 	old.Close()
+	queued.Close()
 }
 
 // SetPlaying starts or pauses playback of the loaded track. With the tape
@@ -249,6 +284,7 @@ type deck struct {
 	src     *Source
 	stream  beep.Streamer
 	gen     uint64
+	seq     uint64 // the last generation handed out
 	playing bool
 	ended   bool
 	gain    float64
@@ -257,6 +293,11 @@ type deck struct {
 	wake    chan struct{} // signalled whenever idle may have changed
 	tape    *transport
 	pull    func([][2]float64) int // d.fill, bound once
+
+	// the queued track, which follows the loaded one without a gap
+	next       *Source
+	nextStream beep.Streamer
+	nextGen    uint64
 }
 
 func newDeck(events chan<- Event) *deck {
@@ -358,8 +399,10 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 }
 
 // fill streams the loaded track into samples and returns how many frames it
-// filled; fewer than len(samples) means the track has ended. The caller must
-// hold d.mu.
+// filled. When the track ends the deck rolls on to the queued track in the
+// same buffer, so the music carries on without a gap; fewer than
+// len(samples) frames means there was none and the deck has stopped. The
+// caller must hold d.mu.
 func (d *deck) fill(samples [][2]float64) int {
 	n := 0
 	for n < len(samples) && !d.ended {
@@ -368,14 +411,24 @@ func (d *deck) fill(samples [][2]float64) int {
 		if ok && k > 0 {
 			continue // a short read is followed by (0, false) at the end
 		}
-		d.ended = true
-		d.changed()
 		err := d.stream.Err()
 		if err == nil && d.src != nil {
 			err = d.src.stream.Err()
 		}
+		ev := Event{Gen: d.gen, Err: err}
+		if d.next != nil {
+			old := d.src
+			d.src, d.stream, d.gen = d.next, d.nextStream, d.nextGen
+			d.next, d.nextStream, d.nextGen = nil, nil, 0
+			d.tape.load(d.src.Tape())
+			ev.Next = d.gen
+			go old.Close() // not on the audio thread
+		} else {
+			d.ended = true
+			d.changed()
+		}
 		select {
-		case d.events <- Event{Gen: d.gen, Err: err}:
+		case d.events <- ev:
 		default:
 		}
 	}

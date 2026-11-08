@@ -184,3 +184,91 @@ func TestDevice(t *testing.T) {
 		t.Fatalf("device is not pulling samples, position %v", p)
 	}
 }
+
+// newTestEngine returns an engine without an output, whose deck the test
+// pulls by hand.
+func newTestEngine() *Engine {
+	e := &Engine{events: make(chan Event, 8)}
+	e.deck = newDeck(e.events)
+	return e
+}
+
+func nextEvent(t *testing.T, e *Engine) Event {
+	t.Helper()
+	select {
+	case ev := <-e.Events():
+		return ev
+	default:
+		t.Fatal("no event")
+		return Event{}
+	}
+}
+
+func TestDeckRollsOnToTheQueuedTrackWithoutAGap(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a.wav"), filepath.Join(dir, "b.wav")
+	writeWAV(t, a, 44100, 100*time.Millisecond)
+	writeWAV(t, b, 48000, 100*time.Millisecond) // resampled
+	srcA, err := Open(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srcB, err := Open(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	e := newTestEngine()
+	genA := e.Start(srcA, true)
+	genB := e.Queue(srcB)
+	out := make([][2]float64, SampleRate.N(300*time.Millisecond))
+	e.deck.Stream(out)
+
+	if ev := nextEvent(t, e); ev.Gen != genA || ev.Next != genB || ev.Err != nil {
+		t.Fatalf("event %+v, want track %d ending into %d", ev, genA, genB)
+	}
+	if ev := nextEvent(t, e); ev.Gen != genB || ev.Next != 0 {
+		t.Fatalf("event %+v, want track %d ending the tape", ev, genB)
+	}
+	// Both 440 Hz tones play back to back: no run of silence until the end
+	// of the second, which is the length of both.
+	end := 0
+	quiet := 0
+	for i, f := range out {
+		if math.Abs(f[0]) > 0.01 {
+			end = i + 1
+			quiet = 0
+			continue
+		}
+		if quiet++; quiet > 2 && end > 0 && i < SampleRate.N(195*time.Millisecond) {
+			t.Fatalf("gap at frame %d", i)
+		}
+	}
+	if want := SampleRate.N(200 * time.Millisecond); end < want-2 || end > want+2 {
+		t.Fatalf("music ends at frame %d, want about %d", end, want)
+	}
+	if p := e.Position(); p != srcB.Length {
+		t.Fatalf("position %v at the end of the second track, want %v", p, srcB.Length)
+	}
+}
+
+func TestDeckStopsWhenTheQueueIsCleared(t *testing.T) {
+	dir := t.TempDir()
+	a, b := filepath.Join(dir, "a.wav"), filepath.Join(dir, "b.wav")
+	writeWAV(t, a, 44100, 50*time.Millisecond)
+	writeWAV(t, b, 44100, 50*time.Millisecond)
+	srcA, _ := Open(a)
+	srcB, _ := Open(b)
+
+	e := newTestEngine()
+	gen := e.Start(srcA, true)
+	e.Queue(srcB)
+	e.Queue(nil)
+	e.deck.Stream(make([][2]float64, SampleRate.N(100*time.Millisecond)))
+	if ev := nextEvent(t, e); ev.Gen != gen || ev.Next != 0 {
+		t.Fatalf("event %+v, want track %d ending the tape", ev, gen)
+	}
+	if e.Speed() != 0 {
+		t.Fatal("the deck plays on without a queued track")
+	}
+}

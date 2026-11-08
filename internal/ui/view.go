@@ -340,7 +340,7 @@ func (m *Model) click(msg tea.MouseClickMsg) tea.Cmd {
 		return m.kickTick()
 	case inZone("shuffle", msg):
 		m.shuffle = !m.shuffle
-		m.order = nil
+		m.resetOrder()
 		return nil
 	case inZone("repeat", msg):
 		m.repeat = (m.repeat + 1) % 3
@@ -394,7 +394,7 @@ func (m *Model) click(msg tea.MouseClickMsg) tea.Cmd {
 	m.plCursor = i
 	if double {
 		m.failures = 0
-		return m.load(m.playlist[i], true)
+		return m.playTrack(m.playlist[i], true)
 	}
 	return nil
 }
