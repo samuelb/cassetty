@@ -73,6 +73,7 @@ type Options struct {
 	Engine          *audio.Engine
 	NowPlaying      *nowplaying.Session // media keys; nil where unsupported
 	Notice          string              // shown once at startup
+	Resume          config.Playback     // where the last run left off
 }
 
 // Model is the root bubbletea model.
@@ -114,6 +115,11 @@ type Model struct {
 	// the shuffled order of the next round, drawn when asked for the track
 	// after the last one, see nextIndexFrom
 	nextOrder []int
+
+	// the track the last run left off at, until it has been opened, and the
+	// position in it
+	resuming *Track
+	resumeAt time.Duration
 
 	// animation
 	tickID         int
@@ -196,6 +202,7 @@ func New(opts Options) *Model {
 			m.dir = filepath.Clean(opts.StartDir)
 		}
 	}
+	m.restore(opts.Resume)
 	m.engine.SetVolume(float64(m.volume) / 100)
 	m.engine.SetTape(m.tape)
 	if opts.Notice != "" {
@@ -224,7 +231,84 @@ func (m *Model) State() config.State {
 		Repeat:  repeatNames[m.repeat],
 		Tape:    m.tape,
 		LastDir: m.dir,
+
+		Playback: m.playback(),
 	}
+}
+
+// playback returns where playback is, for the next run to pick up from.
+func (m *Model) playback() config.Playback {
+	var pb config.Playback
+	for _, t := range m.playlist {
+		pb.Playlist = append(pb.Playlist, t.Path)
+	}
+	if m.shuffle && len(m.order) == len(m.playlist) {
+		pb.Order = slices.Clone(m.order)
+	}
+	cur, pos := m.cur, m.pos
+	switch {
+	case m.src != nil:
+		pos = m.engine.Position() // m.pos is as of the last frame
+	case cur == nil && m.resuming != nil:
+		cur, pos = m.resuming, m.resumeAt // quit before it opened
+	}
+	if cur != nil {
+		m.currentIndex() // brings curHint up to date
+		pb.Track, pb.Index = cur.Path, m.curHint
+		pb.Position = math.Round(pos.Seconds()*1000) / 1000
+	}
+	return pb
+}
+
+// restore brings back the playlist of the last run, with its shuffled order,
+// and remembers the track it left off at for Init to load. Tracks outside
+// the library are left out.
+func (m *Model) restore(pb config.Playback) {
+	// kept[i] is the number of tracks kept before pb.Playlist[i].
+	kept := make([]int, len(pb.Playlist)+1)
+	for i, p := range pb.Playlist {
+		kept[i+1] = kept[i]
+		if filepath.IsAbs(p) && within(m.root, p) {
+			m.playlist = append(m.playlist, &Track{Path: p})
+			kept[i+1]++
+		}
+	}
+	if n := len(m.playlist); n == len(pb.Playlist) && len(pb.Order) == n {
+		seen := make([]bool, n)
+		ok := true
+		for _, i := range pb.Order {
+			if i < 0 || i >= n || seen[i] {
+				ok = false
+				break
+			}
+			seen[i] = true
+		}
+		if ok {
+			m.order = slices.Clone(pb.Order)
+		}
+	}
+	if pb.Track == "" || !filepath.IsAbs(pb.Track) || !within(m.root, pb.Track) {
+		return
+	}
+	at := time.Duration(max(0, pb.Position) * float64(time.Second))
+	m.resuming, m.resumeAt = &Track{Path: pb.Track}, at
+	if i := pb.Index; i >= 0 && i <= len(pb.Playlist) {
+		m.curHint = kept[i]
+		if i < len(pb.Playlist) && kept[i+1] > kept[i] && pb.Playlist[i] == pb.Track {
+			m.resuming = m.playlist[m.curHint]
+			m.plCursor = m.curHint
+		}
+	}
+}
+
+// resume loads the track the last run left off at, paused where it was,
+// and reads the tags of the restored playlist.
+func (m *Model) resume() tea.Cmd {
+	cmds := []tea.Cmd{m.readMeta(m.playlist)}
+	if m.resuming != nil {
+		cmds = append(cmds, m.loadAt(m.resuming, false, m.resumeAt))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) setTheme(i int) {
@@ -278,6 +362,7 @@ type openedMsg struct {
 	meta     library.Meta
 	err      error
 	autoplay bool
+	at       time.Duration // where to put the play head
 }
 
 // queued is the track opened ahead of time so that the deck can roll on to
@@ -309,6 +394,7 @@ func (m *Model) Init() tea.Cmd {
 		m.waitWatch(),
 		m.waitRemote(),
 		m.kickTick(),
+		m.resume(),
 	)
 }
 
@@ -500,7 +586,11 @@ func (m *Model) currentIndex() int {
 }
 
 // load opens the track asynchronously and installs it when ready.
-func (m *Model) load(t *Track, autoplay bool) tea.Cmd {
+func (m *Model) load(t *Track, autoplay bool) tea.Cmd { return m.loadAt(t, autoplay, 0) }
+
+// loadAt is load, with the play head put at position at. A track loaded
+// there without playing waits paused.
+func (m *Model) loadAt(t *Track, autoplay bool, at time.Duration) tea.Cmd {
 	m.loadSeq++
 	m.loading = true
 	seq := m.loadSeq
@@ -510,7 +600,7 @@ func (m *Model) load(t *Track, autoplay bool) tea.Cmd {
 		if err == nil {
 			meta = library.ReadMeta(t.Path)
 		}
-		return openedMsg{seq: seq, track: t, src: src, meta: meta, err: err, autoplay: autoplay}
+		return openedMsg{seq: seq, track: t, src: src, meta: meta, err: err, autoplay: autoplay, at: at}
 	}
 }
 
@@ -520,6 +610,7 @@ func (m *Model) applyOpened(msg openedMsg) tea.Cmd {
 		return nil
 	}
 	m.loading = false
+	m.resuming = nil
 	if msg.err != nil {
 		msg.track.Failed = true
 		m.setFlash(msg.err.Error(), true)
@@ -536,9 +627,15 @@ func (m *Model) applyOpened(msg openedMsg) tea.Cmd {
 	}
 	m.queue = queued{} // Start clears the engine's queue
 	m.install(msg.track, msg.src, msg.meta, m.engine.Start(msg.src, msg.autoplay))
-	if msg.autoplay {
+	if msg.at > 0 {
+		m.seekTo(msg.at)
+	}
+	switch {
+	case msg.autoplay:
 		m.state = statePlaying
-	} else {
+	case m.pos > 0:
+		m.state = statePaused
+	default:
 		m.state = stateStopped
 	}
 	return m.kickTick()

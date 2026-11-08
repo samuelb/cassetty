@@ -112,6 +112,22 @@ type State struct {
 	Repeat  string `json:"repeat,omitempty"`
 	Tape    bool   `json:"tape"`
 	LastDir string `json:"last_dir,omitempty"`
+
+	Playback Playback `json:"playback,omitzero"`
+}
+
+// Playback is where playback was when cassetty quit, so that the next run
+// picks up from there.
+type Playback struct {
+	Playlist []string `json:"playlist,omitempty"`
+	// Order is the shuffled order of the playlist, as indexes into it.
+	Order []int `json:"order,omitempty"`
+	// Track is the loaded track and Index its place in the playlist. For a
+	// track removed from the playlist, Index is where it used to be, or -1.
+	Track string `json:"track,omitempty"`
+	Index int    `json:"index,omitempty"`
+	// Position is how far into Track playback was, in seconds.
+	Position float64 `json:"position,omitempty"`
 }
 
 func statePath() string {

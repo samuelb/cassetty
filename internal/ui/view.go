@@ -2,8 +2,11 @@ package ui
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -442,6 +445,21 @@ func Run(opts Options) (*Model, error) {
 	defer zone.Close()
 	m := New(opts)
 	defer m.Close()
-	_, err := tea.NewProgram(m).Run()
+	p := tea.NewProgram(m)
+	// Closing the terminal hangs up on cassetty, which would otherwise end
+	// it on the spot: quit as usual instead, so that the state is saved.
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-hup:
+			p.Quit()
+		case <-done:
+		}
+	}()
+	_, err := p.Run()
 	return m, err
 }

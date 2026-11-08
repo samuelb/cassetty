@@ -182,7 +182,13 @@ paint_background = true    # paint the terminal background in the theme color (s
 seek_step = 5              # seconds for ←/→ (shift = 6x)
 ```
 
-Remembered state lives in `~/.local/state/cassetty/state.json`.
+cassetty picks up where you left off: it remembers the playlist, the track
+in the deck and how far into it you were, and the next start loads that
+track paused at that point, so `space` plays on. It also remembers the
+volume, skin, shuffle, repeat, tape sound and the last folder. That state
+lives in `~/.local/state/cassetty/state.json` (or
+`$XDG_STATE_HOME/cassetty/state.json`) and is saved when cassetty quits,
+also when its terminal window is closed.
 
 ## Development
 

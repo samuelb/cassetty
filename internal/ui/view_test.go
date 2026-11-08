@@ -27,15 +27,19 @@ func testRoot(t *testing.T) string {
 	return root
 }
 
-func newTestModel(t *testing.T, root string) *Model {
+func newTestModel(t *testing.T, root string, options ...func(*Options)) *Model {
 	t.Helper()
 	zone.NewGlobal()
 	e, _ := audio.NewEngine(true)
 	t.Cleanup(e.Close)
-	m := New(Options{
+	opts := Options{
 		Root: root, Theme: "classic", Volume: 70, SeekStep: 5 * time.Second,
 		Formats: library.NewFormats(audio.SupportedFormats()), Engine: e,
-	})
+	}
+	for _, o := range options {
+		o(&opts)
+	}
+	m := New(opts)
 	t.Cleanup(m.Close)
 	run(m, m.loadDir(m.dir, ""))
 	return m

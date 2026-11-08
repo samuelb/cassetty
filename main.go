@@ -132,14 +132,13 @@ flags:
 		Engine:          engine,
 		NowPlaying:      remote,
 		Notice:          notice,
+		Resume:          state.Playback,
 	})
-	if err != nil {
-		return err
-	}
+	// Also after an error: the terminal may have gone away mid-session.
 	if !*silent {
 		_ = config.SaveState(m.State())
 	}
-	return nil
+	return err
 }
 
 // checkTheme accepts a known theme name, or "" for none.
