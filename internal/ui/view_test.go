@@ -217,3 +217,24 @@ func TestNavigationAndPlayback(t *testing.T) {
 		t.Fatal("tab should switch to the playlist")
 	}
 }
+
+func TestTapeSoundToggle(t *testing.T) {
+	m := newTestModel(t, testRoot(t))
+	press(m, "T")
+	if !m.tape || !m.State().Tape {
+		t.Fatal("T should turn the tape sound on and remember it")
+	}
+	m.flash = "" // the footer is checked elsewhere
+	for _, c := range []struct {
+		w    int
+		want string
+	}{{72, "SH RP"}, {90, "SH TP RP"}, {120, "SHUF TAPE REP"}} {
+		if f := checkFrame(t, m, c.w, 24); !strings.Contains(f, c.want) {
+			t.Errorf("width %d: LCD flags lack %q", c.w, c.want)
+		}
+	}
+	press(m, "T")
+	if m.tape || m.State().Tape {
+		t.Fatal("T should turn the tape sound off again")
+	}
+}

@@ -142,10 +142,15 @@ func (m *Model) renderCassette(w, h int) []string {
 		lines = append(lines, shellRow(lb.String(), lw, " ", " "))
 	}
 
-	// Label bottom: tape type and running time.
+	// Label bottom: tape type, printed bold while it is heard, and running
+	// time.
 	{
 		var lb lineBuf
-		lb.add(labelMuted, "  "+truncate(m.tapeType(), lw/2))
+		tapeStyle := labelMuted
+		if m.tape {
+			tapeStyle = label.Bold(true)
+		}
+		lb.add(tapeStyle, "  "+truncate(m.tapeType(), lw/2))
 		right := m.tapeLength() + "  "
 		lb.padTo(label, lw-len([]rune(right)))
 		lb.add(labelMuted, right)

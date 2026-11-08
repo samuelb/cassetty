@@ -115,8 +115,9 @@ leaves that root folder.
 | `tab` `1` `2` | library · playlist | `S` | shuffle |
 | `enter` | play selected | `r` | repeat off · all · one |
 | `d` `x` | remove | `i` | elapsed · remaining |
-| `c` | clear all | `t` | next theme |
-| `K` `J` | move up / down | `?` | all keys |
+| `c` | clear all | `T` | tape sound |
+| `K` `J` | move up / down | `t` | next theme |
+| | | `?` | all keys |
 | | | `q` | quit |
 
 On macOS the media keys work too, as do headphone buttons and the Now
@@ -128,6 +129,16 @@ On Linux cassetty is an [MPRIS](https://specifications.freedesktop.org/mpris-spe
 player: the media keys, the media widgets of GNOME, KDE Plasma and other
 desktops, and `playerctl` show the playing track, seek in it, and set the
 volume, shuffle and repeat.
+
+## Tape sound
+
+Press `T` to hear the music come off a cassette: the tape wows and flutters,
+hisses quietly, saturates a little and loses some treble. How much depends on
+the tape type printed on the label, which follows the file: lossless files
+play from metal tape (type IV), MP3, Ogg and Opus from chrome (type II) and
+everything else from normal tape (type I), which hisses the most. Pausing
+winds the tape down and playing winds it up again. cassetty remembers the
+setting; with it off, the decoded audio plays unchanged.
 
 ## Skins
 
@@ -184,8 +195,8 @@ CASSETTY_TEST_NOWPLAYING=1 go test ./internal/nowplaying -run TestSession
 CASSETTY_PREVIEW=/tmp/cassette.ans go test ./internal/ui -run TestCassettePreview && cat /tmp/cassette.ans
 ```
 
-Layout: `internal/audio` (decoding, the always-running deck streamer, oto
-output, sample tap), `internal/viz` (FFT spectrum and VU ballistics),
+Layout: `internal/audio` (decoding, the always-running deck streamer and
+its tape transport, oto output, sample tap), `internal/viz` (FFT spectrum and VU ballistics),
 `internal/library` (folder listing, natural sort, recursive collection,
 tags), `internal/watch` (watches the shown folder with one kqueue/inotify
 handle; no per-file descriptors), `internal/nowplaying` (media keys: the

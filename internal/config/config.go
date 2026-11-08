@@ -110,6 +110,7 @@ type State struct {
 	Theme   string `json:"theme,omitempty"`
 	Shuffle bool   `json:"shuffle"`
 	Repeat  string `json:"repeat,omitempty"`
+	Tape    bool   `json:"tape"`
 	LastDir string `json:"last_dir,omitempty"`
 }
 

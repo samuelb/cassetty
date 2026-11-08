@@ -345,6 +345,9 @@ func (m *Model) click(msg tea.MouseClickMsg) tea.Cmd {
 	case inZone("repeat", msg):
 		m.repeat = (m.repeat + 1) % 3
 		return nil
+	case inZone("tape", msg):
+		m.toggleTape()
+		return nil
 	case inZone("time:0", msg), inZone("time:1", msg), inZone("time:2", msg):
 		m.remaining = !m.remaining
 		return nil

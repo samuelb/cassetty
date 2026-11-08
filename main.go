@@ -125,6 +125,7 @@ flags:
 		ShowHidden:      cfg.ShowHidden,
 		Shuffle:         state.Shuffle,
 		Repeat:          state.Repeat,
+		Tape:            state.Tape,
 		PaintBackground: cfg.PaintBackground,
 		SeekStep:        time.Duration(cfg.SeekStep) * time.Second,
 		Formats:         library.NewFormats(audio.SupportedFormats()),

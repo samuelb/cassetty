@@ -66,6 +66,7 @@ type Options struct {
 	ShowHidden      bool
 	Shuffle         bool
 	Repeat          string
+	Tape            bool // start with the tape sound on
 	PaintBackground bool
 	SeekStep        time.Duration
 	Formats         library.Formats
@@ -105,6 +106,7 @@ type Model struct {
 	loading   bool
 	failures  int
 	remaining bool
+	tape      bool // the tape sound is on
 
 	// animation
 	tickID         int
@@ -168,6 +170,7 @@ func New(opts Options) *Model {
 		curHint:  -1,
 		volume:   opts.Volume,
 		shuffle:  opts.Shuffle,
+		tape:     opts.Tape,
 		spectrum: viz.NewSpectrum(),
 		frames:   make([][2]float64, viz.FrameSize),
 		root:     filepath.Clean(opts.Root),
@@ -187,6 +190,7 @@ func New(opts Options) *Model {
 		}
 	}
 	m.engine.SetVolume(float64(m.volume) / 100)
+	m.engine.SetTape(m.tape)
 	if opts.Notice != "" {
 		m.setFlash(opts.Notice, true)
 	}
@@ -211,6 +215,7 @@ func (m *Model) State() config.State {
 		Theme:   m.theme.Name,
 		Shuffle: m.shuffle,
 		Repeat:  repeatNames[m.repeat],
+		Tape:    m.tape,
 		LastDir: m.dir,
 	}
 }
@@ -295,7 +300,7 @@ func (m *Model) kickTick() tea.Cmd {
 }
 
 func (m *Model) animating() bool {
-	if m.state == statePlaying || m.spin != 0 || m.drag != "" {
+	if m.state == statePlaying || m.spin != 0 || m.drag != "" || m.engine.Speed() > 0 {
 		return true
 	}
 	if m.vu.L > 0.002 || m.vu.R > 0.002 || m.vu.PeakL > 0.002 || m.vu.PeakR > 0.002 {
@@ -327,12 +332,12 @@ func (m *Model) animate(dt float64) {
 		m.pos = m.engine.Position()
 	}
 	playing := m.state == statePlaying
+	// The tape keeps moving for a moment after a pause while it winds down.
+	motor := m.engine.Speed()
+	running := motor > 0
 
 	if m.src != nil {
-		speed := m.spin
-		if playing {
-			speed++
-		}
+		speed := m.spin + motor
 		// Constant tape speed: angular velocity is inversely proportional
 		// to the radius of the tape pack on each reel.
 		const rMin, rMax, base = 1.0, 2.3, 4.0
@@ -351,11 +356,11 @@ func (m *Model) animate(dt float64) {
 		m.spin = 0
 	}
 
-	if playing {
+	if running {
 		m.engine.Snapshot(m.frames)
 	}
-	m.spectrum.Update(m.frames, m.lay.specBars, float64(audio.SampleRate), dt, playing)
-	m.vu.Update(m.frames[len(m.frames)-2048:], dt, playing)
+	m.spectrum.Update(m.frames, m.lay.specBars, float64(audio.SampleRate), dt, running)
+	m.vu.Update(m.frames[len(m.frames)-2048:], dt, running)
 
 	if playing {
 		m.marquee += dt * 5
@@ -570,8 +575,9 @@ func (m *Model) stop() tea.Cmd {
 	if m.src == nil {
 		return nil
 	}
-	m.seekTo(0)
-	return m.setState(stateStopped)
+	cmd := m.setState(stateStopped)
+	m.seekTo(0) // after stopping, so the tape does not wind down from the start
+	return cmd
 }
 
 func (m *Model) eject() tea.Cmd {
@@ -615,16 +621,22 @@ func (m *Model) seekBy(d time.Duration) tea.Cmd {
 }
 
 func (m *Model) trackEnded() tea.Cmd {
+	// A track can also end while paused, as the tape winds down.
+	play := m.state == statePlaying
 	if m.repeat == repeatOne && m.src != nil {
 		m.seekTo(0)
+		if !play {
+			return nil
+		}
 		return m.setState(statePlaying)
 	}
 	if i, ok := m.nextIndex(); ok {
-		return m.load(m.playlist[i], true)
+		return m.load(m.playlist[i], play)
 	}
+	cmd := m.setState(stateStopped)
 	m.seekTo(0)
 	m.setFlash("end of tape", false)
-	return m.setState(stateStopped)
+	return cmd
 }
 
 func (m *Model) next() tea.Cmd {
@@ -734,6 +746,12 @@ func (m *Model) setShuffle(on bool) {
 func (m *Model) setRepeat(r repeatMode) {
 	m.repeat = r
 	m.setFlash("repeat "+repeatNames[r], false)
+}
+
+func (m *Model) toggleTape() {
+	m.tape = !m.tape
+	m.engine.SetTape(m.tape)
+	m.setFlash("tape sound "+onOff(m.tape), false)
 }
 
 func (m *Model) toggleMute() {
@@ -950,13 +968,7 @@ func (m *Model) tapeType() string {
 	if m.src == nil {
 		return ""
 	}
-	switch m.src.Codec {
-	case "FLAC", "WAV", "ALAC", "AIFF", "AIF":
-		return "TYPE IV · METAL"
-	case "MP3", "OGG", "VORBIS", "OPUS":
-		return "TYPE II · CrO2"
-	}
-	return "TYPE I · NORMAL"
+	return m.src.Tape().String()
 }
 
 // tapeLength names the cassette after the track length, e.g. "C-46".
@@ -1042,6 +1054,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.setFlash("theme: "+m.theme.Name, false)
 	case key.Matches(msg, k.Remaining):
 		m.remaining = !m.remaining
+	case key.Matches(msg, k.Tape):
+		m.toggleTape()
 	case key.Matches(msg, k.Tab):
 		m.switchTab()
 	case msg.String() == "1":

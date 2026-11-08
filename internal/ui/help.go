@@ -49,6 +49,7 @@ func (m *Model) helpSections() []helpSection {
 			{"S", "shuffle"},
 			{"r", "repeat off · all · one"},
 			{"i", "elapsed · remaining time"},
+			{"T", "tape sound"},
 			{"t", "next theme"},
 			{"q", "quit"},
 		}},
@@ -59,7 +60,7 @@ func (m *Model) helpSections() []helpSection {
 			{"dbl-click", "open folder · play"},
 			{"right-click", "add to playlist"},
 			{"cassette", "play / pause"},
-			{"LCD", "time mode · SHUF · REP"},
+			{"LCD", "time mode · SHUF · TAPE · REP"},
 		}},
 	}
 }

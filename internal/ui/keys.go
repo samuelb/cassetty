@@ -12,6 +12,7 @@ type keyMap struct {
 	SeekBack, SeekFwd, SeekBackFar, SeekFwdFar key.Binding
 	VolUp, VolDown, Mute                       key.Binding
 	Shuffle, Repeat, Eject, Theme, Remaining   key.Binding
+	Tape                                       key.Binding
 
 	Up, Down, PageUp, PageDown, Top, Bottom key.Binding
 	Open, Back, Root, Enqueue, PlayAll      key.Binding
@@ -45,6 +46,7 @@ func newKeyMap() keyMap {
 		Eject:     b([]string{"e"}, "e", "eject"),
 		Theme:     b([]string{"t"}, "t", "next theme"),
 		Remaining: b([]string{"i"}, "i", "elapsed/remaining"),
+		Tape:      b([]string{"T"}, "T", "tape sound"),
 
 		Up:       b([]string{"up", "k"}, "↑/k", "up"),
 		Down:     b([]string{"down", "j"}, "↓/j", "down"),

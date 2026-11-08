@@ -45,7 +45,7 @@ type output interface {
 // samples in real time; InitErr then reports why the device was not used.
 func NewEngine(silent bool) (e *Engine, initErr error) {
 	e = &Engine{events: make(chan Event, 8)}
-	e.deck = &deck{gain: 1, events: e.events, tap: newTap(1 << 15), wake: make(chan struct{}, 1)}
+	e.deck = newDeck(e.events)
 
 	if !silent {
 		const buffer = 100 * time.Millisecond
@@ -110,8 +110,15 @@ func (e *Engine) Start(src *Source, play bool) uint64 {
 	gen := d.gen
 	d.src = src
 	d.stream = wrapStream(src)
-	d.playing = play
+	d.setPlaying(play)
+	if !play {
+		d.tape.motor = 0 // a new tape does not wind down from where the old one was
+	}
 	d.ended = false
+	d.tape.reset()
+	if src != nil {
+		d.tape.load(src.Tape())
+	}
 	d.mu.Unlock()
 	d.changed()
 	if old != nil && old != src {
@@ -128,17 +135,45 @@ func (e *Engine) Eject() {
 	d.gen++
 	d.src, d.stream = nil, nil
 	d.playing = false
+	d.tape.motor = 0
+	d.tape.reset()
 	d.mu.Unlock()
 	d.changed()
 	old.Close()
 }
 
-// SetPlaying starts or pauses playback of the loaded track.
+// SetPlaying starts or pauses playback of the loaded track. With the tape
+// sound on, the tape takes a moment to get up to speed and winds down when
+// it pauses.
 func (e *Engine) SetPlaying(play bool) {
 	e.deck.mu.Lock()
-	e.deck.playing = play
+	e.deck.setPlaying(play)
 	e.deck.mu.Unlock()
 	e.deck.changed()
+}
+
+// SetTape turns the tape sound on or off: wow and flutter, hiss, saturation
+// and a softer treble, after the tape type of the track, and a tape that
+// winds up when it starts and down when it pauses.
+func (e *Engine) SetTape(on bool) {
+	d := e.deck
+	d.mu.Lock()
+	d.tape.setOn(on)
+	d.setPlaying(d.playing) // without the tape sound the motor no longer eases
+	d.mu.Unlock()
+	d.changed()
+}
+
+// Speed returns how fast the tape moves: 0 when it stands still, 1 when it
+// plays, and in between while it winds up or down.
+func (e *Engine) Speed() float64 {
+	d := e.deck
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.idle() {
+		return 0
+	}
+	return d.tape.motor
 }
 
 // Seek moves the play head of the loaded track to t.
@@ -161,7 +196,11 @@ func (e *Engine) Seek(t time.Duration) error {
 	}
 	// Recreate the resampler so no stale samples from before the seek play.
 	d.stream = wrapStream(d.src)
+	d.tape.reset()
 	d.ended = false
+	if !d.playing {
+		d.tape.motor = 0 // the tape winding down must not play the new position
+	}
 	d.changed()
 	return nil
 }
@@ -216,12 +255,33 @@ type deck struct {
 	events  chan<- Event
 	tap     *tap
 	wake    chan struct{} // signalled whenever idle may have changed
+	tape    *transport
+	pull    func([][2]float64) int // d.fill, bound once
+}
+
+func newDeck(events chan<- Event) *deck {
+	d := &deck{gain: 1, events: events, tap: newTap(1 << 15), wake: make(chan struct{}, 1), tape: newTransport()}
+	d.pull = d.fill
+	return d
 }
 
 // idle reports whether the deck has nothing to play and emits silence.
 // The caller must hold d.mu.
 func (d *deck) idle() bool {
-	return d.stream == nil || !d.playing || d.ended
+	return d.stream == nil || d.ended || (!d.playing && d.tape.motor == 0)
+}
+
+// setPlaying starts or stops the tape. With the tape sound on the motor
+// eases up to speed and the tape winds down (see transport); otherwise both
+// happen at once. The caller must hold d.mu.
+func (d *deck) setPlaying(play bool) {
+	d.playing = play
+	if !d.tape.on {
+		d.tape.motor = 0
+		if play {
+			d.tape.motor = 1
+		}
+	}
 }
 
 // changed tells the idle watcher that idle may have changed. It never
@@ -282,7 +342,7 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 		return len(samples), true
 	}
 
-	n, ok := d.stream.Stream(samples)
+	n := d.tape.process(samples, d.playing, d.pull)
 	if n > 0 {
 		d.tap.write(samples[:n])
 		for i := range samples[:n] {
@@ -291,8 +351,23 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 		}
 	}
 	clear(samples[n:])
+	if !d.playing && d.tape.motor == 0 {
+		d.changed() // the tape has wound down, so the output can be suspended
+	}
+	return len(samples), true
+}
 
-	if !ok || n == 0 {
+// fill streams the loaded track into samples and returns how many frames it
+// filled; fewer than len(samples) means the track has ended. The caller must
+// hold d.mu.
+func (d *deck) fill(samples [][2]float64) int {
+	n := 0
+	for n < len(samples) && !d.ended {
+		k, ok := d.stream.Stream(samples[n:])
+		n += k
+		if ok && k > 0 {
+			continue // a short read is followed by (0, false) at the end
+		}
 		d.ended = true
 		d.changed()
 		err := d.stream.Err()
@@ -304,7 +379,7 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 		default:
 		}
 	}
-	return len(samples), true
+	return n
 }
 
 func (d *deck) Err() error { return nil }
