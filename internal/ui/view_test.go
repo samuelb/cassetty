@@ -224,7 +224,6 @@ func TestTapeSoundToggle(t *testing.T) {
 	if !m.tape || !m.State().Tape {
 		t.Fatal("T should turn the tape sound on and remember it")
 	}
-	m.flash = "" // the footer is checked elsewhere
 	for _, c := range []struct {
 		w    int
 		want string
@@ -236,5 +235,28 @@ func TestTapeSoundToggle(t *testing.T) {
 	press(m, "T")
 	if m.tape || m.State().Tape {
 		t.Fatal("T should turn the tape sound off again")
+	}
+}
+
+func TestFooterFitsAMessage(t *testing.T) {
+	m := newTestModel(t, testRoot(t))
+	for _, c := range []struct {
+		flash     string
+		isErr     bool
+		filtering bool
+	}{
+		{"shuffle on", false, false},
+		{"cannot play a file with a rather long name.mp3: unsupported format", true, false},
+		{"playlist cleared", false, true},
+	} {
+		m.setFlash(c.flash, c.isErr)
+		m.filtering = c.filtering
+		for _, w := range []int{72, 80, 120, 200} {
+			lines := strings.Split(checkFrame(t, m, w, 24), "\n")
+			footer := lines[len(lines)-1]
+			if want := truncate(c.flash, w/2) + " "; !strings.HasSuffix(footer, want) {
+				t.Errorf("width %d: footer %q does not end in %q", w, footer, want)
+			}
+		}
 	}
 }

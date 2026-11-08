@@ -144,10 +144,11 @@ func (m *Model) renderFooter() string {
 	} else {
 		left = " " + m.shortHelpLine(max(10, w-rw-2))
 	}
+	gap := 0
 	if rw > 0 {
-		rw += 2 // keep the hints clear of the message
+		gap = 2 // keep the hints clear of the message
 	}
-	left = ansi.Truncate(left, max(0, w-rw), "")
+	left = ansi.Truncate(left, max(0, w-rw-gap), "")
 	return left + strings.Repeat(" ", max(0, w-ansi.StringWidth(left)-rw)) + right
 }
 
