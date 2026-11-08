@@ -60,6 +60,23 @@ func TestReadDirAndCollect(t *testing.T) {
 		t.Fatalf("Collect = %q, want %q", paths, want)
 	}
 
+	walked, err := Walk(root, f, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, e := range walked {
+		rel, _ := filepath.Rel(root, e.Path)
+		if e.IsDir {
+			rel += "/"
+		}
+		got = append(got, rel)
+	}
+	want = []string{"z.mp3", "a/", "a/sub/", "a/sub/1.ogg", "b/", "b/2.flac", "b/10.mp3"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("Walk = %q, want %q", got, want)
+	}
+
 	// Symlink loops must not hang the walk.
 	if err := os.Symlink(root, filepath.Join(root, "a", "loop")); err == nil {
 		if _, err := Collect(root, f, false); err != nil {

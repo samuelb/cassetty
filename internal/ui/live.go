@@ -130,20 +130,25 @@ func (m *Model) applyRefresh(msg dirMsg) tea.Cmd {
 	}
 
 	grew := listingGrew(m.entries, msg.entries)
-	sel, hadSel := m.selectedEntry()
-	cursor := m.cursor
-	m.entries, m.dirErr = msg.entries, nil
-	m.refilter()
-	m.cursor = min(cursor, max(0, len(m.visible)-1))
-	if hadSel {
-		for i, idx := range m.visible {
-			if m.entries[idx].Name == sel.Name {
-				m.cursor = i
-				break
+	if m.search.on {
+		// The list shows the search; the folder shows again when it ends.
+		m.entries, m.dirErr = msg.entries, nil
+	} else {
+		sel, hadSel := m.selectedEntry()
+		cursor := m.cursor
+		m.entries, m.dirErr = msg.entries, nil
+		m.refilter()
+		m.cursor = min(cursor, max(0, len(m.visible)-1))
+		if hadSel {
+			for i, idx := range m.visible {
+				if m.entries[idx].Name == sel.Name {
+					m.cursor = i
+					break
+				}
 			}
 		}
+		m.ensureVisible()
 	}
-	m.ensureVisible()
 
 	cmd := m.watchDir() // re-arm, the path may refer to a new folder now
 	if grew {

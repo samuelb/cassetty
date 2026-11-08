@@ -85,6 +85,8 @@ func press(m *Model, k string) {
 		msg = tea.KeyPressMsg{Code: tea.KeyBackspace}
 	case "tab":
 		msg = tea.KeyPressMsg{Code: tea.KeyTab}
+	case "esc":
+		msg = tea.KeyPressMsg{Code: tea.KeyEscape}
 	default:
 		msg = tea.KeyPressMsg{Code: rune(k[0]), Text: k}
 	}

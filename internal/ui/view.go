@@ -142,8 +142,13 @@ func (m *Model) renderFooter() string {
 	var left string
 	if m.filtering {
 		k, d := fg(t.Accent), fg(t.Muted)
-		left = " " + k.Render("type") + d.Render(" to filter · ") + k.Render("⏎") + d.Render(" accept · ") +
-			k.Render("esc") + d.Render(" clear · ") + k.Render("↑↓") + d.Render(" move")
+		verb, esc, tab := "filter", "clear", "whole library"
+		if m.search.on {
+			verb, esc, tab = "search", "back", "this folder"
+		}
+		left = " " + k.Render("type") + d.Render(" to "+verb+" · ") + k.Render("⏎") + d.Render(" accept · ") +
+			k.Render("esc") + d.Render(" "+esc+" · ") + k.Render("tab") + d.Render(" "+tab+" · ") +
+			k.Render("↑↓") + d.Render(" move")
 	} else {
 		left = " " + m.shortHelpLine(max(10, w-rw-2))
 	}
@@ -196,6 +201,9 @@ func (m *Model) overCassette(msg tea.MouseMsg) bool {
 }
 
 func (m *Model) crumbAt(msg tea.MouseMsg) (string, bool) {
+	if m.search.on {
+		return "", false // the search shows instead of the breadcrumb
+	}
 	for d := m.dir; within(m.root, d); {
 		if inZone(crumbID(d), msg) {
 			return d, true

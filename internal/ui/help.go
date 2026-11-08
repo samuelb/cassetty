@@ -36,6 +36,7 @@ func (m *Model) helpSections() []helpSection {
 			{"a", "add to playlist"},
 			{"A", "play, replacing playlist"},
 			{"/", "filter  (esc clears)"},
+			{"F", "search the whole library"},
 			{"f", "find the playing track"},
 		}},
 		{"PLAYLIST", [][2]string{

@@ -107,11 +107,11 @@ leaves that root folder.
 |---|---|---|---|
 | `space` `p` | play / pause | `↑↓` `jk` | move (`pgup` `pgdn` `g` `G`) |
 | `s` `v` | stop | `enter` `l` | open folder · play track |
-| `<` `>` | previous · next (`z` `b` `n`) | `backspace` `h` | parent folder |
-| `←` `→` | seek 5 s | `~` | library root |
-| `shift+←` `shift+→` | seek 30 s (`[` `]`) | `a` | add to playlist |
-| `+` `-` | volume | `A` | play, replacing playlist |
-| `m` | mute | `/` | filter, `esc` clears |
+| `<` `>` | previous · next (`z` `b` `n`) | `backspace` `h` `~` | parent folder · root |
+| `←` `→` | seek 5 s | `a` | add to playlist |
+| `shift+←` `shift+→` | seek 30 s (`[` `]`) | `A` | play, replacing playlist |
+| `+` `-` | volume | `/` | filter, `esc` clears |
+| `m` | mute | `F` | search the whole library |
 | `e` | eject | `f` | find the playing track |
 
 | Playlist | | Modes | |
@@ -123,6 +123,14 @@ leaves that root folder.
 | `K` `J` | move up / down | `t` | next theme |
 | | | `?` | all keys |
 | | | `q` | quit |
+
+`/` filters the folder you are in. `F` searches the whole library instead: it
+matches the words you type against the paths of the folders and files below
+the music folder, so `floyd wall` finds the folder *Pink Floyd/The Wall* and
+its tracks. `tab` switches between the two while you type. `enter` on a track
+plays its folder from that track, as in the browser, and `esc` goes back to
+the folder you were in. Each search reads the library afresh, so it finds
+what you added since.
 
 On macOS the media keys work too, as do headphone buttons and the Now
 Playing widget in Control Center, which shows the playing track and can seek

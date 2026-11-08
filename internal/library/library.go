@@ -85,10 +85,23 @@ func ReadDir(dir string, formats Formats, showHidden bool) ([]Entry, error) {
 	return append(dirs, files...), nil
 }
 
-// Collect returns all playable files below dir, depth first and sorted
-// like the browser, with each folder's files before its sub folders.
+// Collect returns all playable files below dir, in the order of Walk.
 func Collect(dir string, formats Formats, showHidden bool) ([]string, error) {
+	entries, err := Walk(dir, formats, showHidden)
 	var out []string
+	for _, e := range entries {
+		if !e.IsDir {
+			out = append(out, e.Path)
+		}
+	}
+	return out, err
+}
+
+// Walk returns the sub folders and playable files below dir, depth first
+// and sorted like the browser: each folder's files come before its sub
+// folders, and each sub folder right before what is in it.
+func Walk(dir string, formats Formats, showHidden bool) ([]Entry, error) {
+	var out []Entry
 	seen := map[string]bool{}
 	var walk func(string, int) error
 	walk = func(d string, depth int) error {
@@ -105,15 +118,16 @@ func Collect(dir string, formats Formats, showHidden bool) ([]string, error) {
 			}
 			return nil // skip unreadable sub folders
 		}
-		// A folder's own tracks play before those of its sub folders, so
-		// "Bonus" or "Extras" folders come after the album.
+		// A folder's own tracks come before those of its sub folders, so
+		// "Bonus" or "Extras" folders play after the album.
 		for _, e := range entries {
 			if !e.IsDir {
-				out = append(out, e.Path)
+				out = append(out, e)
 			}
 		}
 		for _, e := range entries {
 			if e.IsDir && depth < 32 {
+				out = append(out, e)
 				if err := walk(e.Path, depth+1); err != nil {
 					return err
 				}

@@ -35,6 +35,7 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 		m.setFlash(msg.err.Error(), true)
 		return nil
 	}
+	m.endSearch("") // going to a folder ends the search
 	if m.dir != msg.dir {
 		if e, ok := m.selectedEntry(); ok {
 			m.memory[m.dir] = e.Name
@@ -57,12 +58,23 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 	return m.watchDir()
 }
 
+// refilter lists the entries that match the filter: by name in the shown
+// folder, or by path relative to the root while searching the library.
 func (m *Model) refilter() {
 	m.visible = m.visible[:0]
 	terms := strings.Fields(strings.ToLower(m.filter))
+	entries := m.shown()
+	if m.search.on && len(terms) == 0 {
+		entries = nil // nothing to search for yet
+	}
 outer:
-	for i, e := range m.entries {
-		name := strings.ToLower(e.Name)
+	for i, e := range entries {
+		var name string
+		if m.search.on {
+			name = m.search.keys[i]
+		} else {
+			name = strings.ToLower(e.Name)
+		}
 		for _, t := range terms {
 			if !strings.Contains(name, t) {
 				continue outer
@@ -78,7 +90,7 @@ func (m *Model) selectedEntry() (library.Entry, bool) {
 	if m.cursor < 0 || m.cursor >= len(m.visible) {
 		return library.Entry{}, false
 	}
-	return m.entries[m.visible[m.cursor]], true
+	return m.shown()[m.visible[m.cursor]], true
 }
 
 func (m *Model) listRows() int { return max(1, m.lay.listRows) }
@@ -143,6 +155,9 @@ func (m *Model) enqueue() tea.Cmd {
 func (m *Model) playAll() tea.Cmd {
 	e, ok := m.selectedEntry()
 	if !ok {
+		if m.search.on {
+			return nil
+		}
 		return m.collect(m.dir, collectPlay)
 	}
 	if e.IsDir {
@@ -177,6 +192,8 @@ func (m *Model) handleLibraryKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.cursor = len(m.visible) - 1
 	case key.Matches(msg, k.Open):
 		return m.open()
+	case key.Matches(msg, k.Back) && m.search.on:
+		m.endSearch("")
 	case key.Matches(msg, k.Back):
 		return m.back()
 	case key.Matches(msg, k.Root):
@@ -189,6 +206,8 @@ func (m *Model) handleLibraryKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.locate()
 	case key.Matches(msg, k.Filter):
 		m.filtering = true
+	case msg.String() == "esc" && m.search.on:
+		m.endSearch("")
 	case msg.String() == "esc" && m.filter != "":
 		m.filter = ""
 		m.refilter()
@@ -200,7 +219,19 @@ func (m *Model) handleLibraryKey(msg tea.KeyPressMsg) tea.Cmd {
 func (m *Model) handleFilterKey(msg tea.KeyPressMsg) tea.Cmd {
 	switch msg.String() {
 	case "esc":
-		m.filter, m.filtering = "", false
+		m.filtering = false
+		if m.search.on {
+			m.endSearch("")
+			return nil
+		}
+		m.filter = ""
+	case "tab":
+		// The same query, in the folder or in the whole library.
+		if m.search.on {
+			m.endSearch(m.filter)
+			return nil
+		}
+		return m.startSearch()
 	case "enter":
 		m.filtering = false
 		if len(m.visible) == 1 {
@@ -305,7 +336,11 @@ func (m *Model) renderBrowser(w, h int) string {
 	var body []string
 	switch {
 	case m.tab == tabLibrary:
-		p.right = m.breadcrumb(inner - title.w - 6)
+		if m.search.on {
+			p.right = m.searchLabel(inner - title.w - 6)
+		} else {
+			p.right = m.breadcrumb(inner - title.w - 6)
+		}
 		body = m.libraryRows(inner, rows)
 		p.total, p.offset, p.visible = len(m.visible), m.offset, rows
 		p.footL = m.filterLine()
@@ -411,13 +446,29 @@ func (m *Model) breadcrumb(w int) string {
 
 func crumbID(path string) string { return "crumb:" + path }
 
+// searchLabel says, in at most w cells, that the list searches the whole
+// library.
+func (m *Model) searchLabel(w int) string {
+	t := m.theme
+	name := "♫ " + filepath.Base(m.root)
+	return fg(t.Muted).Render(" searching ") +
+		fg(t.Text).Bold(true).Render(truncate(name, max(4, w-ansi.StringWidth(" searching ")-1))) +
+		fg(t.Muted).Render(" ")
+}
+
 func (m *Model) filterLine() string {
 	t := m.theme
+	label, done := " filter: ", " (esc clears) "
+	if m.search.on {
+		label, done = " search: ", " (esc goes back) "
+	}
 	switch {
+	case m.filtering && m.search.on:
+		return fg(t.Accent).Render(label) + fg(t.Text).Render(m.filter) + fg(t.Accent).Render("▏ ")
 	case m.filtering:
 		return fg(t.Accent).Render(" / ") + fg(t.Text).Render(m.filter) + fg(t.Accent).Render("▏ ")
-	case m.filter != "":
-		return fg(t.Muted).Render(" filter: ") + fg(t.Accent2).Render(m.filter) + fg(t.Faint).Render(" (esc clears) ")
+	case m.filter != "" || m.search.on:
+		return fg(t.Muted).Render(label) + fg(t.Accent2).Render(m.filter) + fg(t.Faint).Render(done)
 	}
 	return ""
 }
@@ -444,7 +495,21 @@ func (m *Model) nowPlayingGlyph() string {
 
 func (m *Model) libraryRows(w, rows int) []string {
 	t := m.theme
-	if m.dirErr != nil {
+	if m.search.on {
+		s := m.search
+		switch {
+		case !s.ready && s.err != nil:
+			return m.emptyState(w, rows, fg(t.Error), "cannot read the library", s.err.Error())
+		case !s.ready:
+			return m.emptyState(w, rows, fg(t.Muted), "reading the library…", "")
+		case strings.TrimSpace(m.filter) == "":
+			return m.emptyState(w, rows, fg(t.Muted), "search the whole library",
+				"type part of a folder or file name · tab searches this folder instead")
+		case len(m.visible) == 0:
+			return m.emptyState(w, rows, fg(t.Muted), "nothing in the library matches “"+m.filter+"”",
+				"esc goes back to "+filepath.Base(m.dir))
+		}
+	} else if m.dirErr != nil {
 		return m.emptyState(w, rows, fg(t.Error), "cannot read folder", m.dirErr.Error())
 	}
 	if len(m.visible) == 0 {
@@ -463,7 +528,7 @@ func (m *Model) libraryRows(w, rows int) []string {
 		if i >= len(m.visible) {
 			break
 		}
-		e := m.entries[m.visible[i]]
+		e := m.shown()[m.visible[i]]
 		sel := i == m.cursor
 		base := m.rowStyle(sel, i)
 		var lb lineBuf
@@ -496,7 +561,15 @@ func (m *Model) libraryRows(w, rows int) []string {
 			name += "/"
 		}
 		nameW := w - lb.w - ansi.StringWidth(right) - 3
-		m.highlight(&lb, truncate(name, nameW), nameStyle, base)
+		name = truncate(name, nameW)
+		m.highlight(&lb, name, nameStyle, base)
+		if m.search.on {
+			// Where in the library it is, in what room is left.
+			if dir, room := m.folderOf(e), nameW-ansi.StringWidth(name)-2; dir != "" && room > 6 {
+				lb.add(base, "  ")
+				m.highlight(&lb, truncate(dir, room), base.Foreground(t.Muted), base)
+			}
+		}
 		lb.padTo(base, w-ansi.StringWidth(right)-2)
 		lb.add(base.Foreground(t.Faint), right).padTo(base, w)
 		out = append(out, lb.String())

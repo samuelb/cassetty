@@ -16,7 +16,7 @@ type keyMap struct {
 
 	Up, Down, PageUp, PageDown, Top, Bottom key.Binding
 	Open, Back, Root, Enqueue, PlayAll      key.Binding
-	Filter, Locate, Tab                     key.Binding
+	Filter, Search, Locate, Tab             key.Binding
 	Remove, Clear, MoveUp, MoveDown         key.Binding
 
 	Help, Quit key.Binding
@@ -61,6 +61,7 @@ func newKeyMap() keyMap {
 		Enqueue: b([]string{"a"}, "a", "add to playlist"),
 		PlayAll: b([]string{"A"}, "A", "play, replacing playlist"),
 		Filter:  b([]string{"/"}, "/", "filter"),
+		Search:  b([]string{"F"}, "F", "search the library"),
 		Locate:  b([]string{"f"}, "f", "find playing track"),
 		Tab:     b([]string{"tab", "shift+tab"}, "tab", "library/playlist"),
 

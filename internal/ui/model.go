@@ -143,6 +143,7 @@ type Model struct {
 	filter    string
 	filtering bool
 	dirErr    error
+	search    librarySearch
 
 	// live updates of the shown folder
 	watcher    *watch.Watcher
@@ -512,6 +513,9 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case collectMsg:
 		return m, m.applyCollect(msg)
+
+	case scanMsg:
+		return m, m.applyScan(msg)
 
 	case openedMsg:
 		return m, m.applyOpened(msg)
@@ -1076,8 +1080,9 @@ func (m *Model) collect(dir string, mode collectMode) tea.Cmd {
 func (m *Model) playFromDir(e library.Entry) tea.Cmd {
 	var tracks []*Track
 	start := 0
-	for _, en := range m.entries {
-		if en.IsDir {
+	dir := filepath.Dir(e.Path)
+	for _, en := range m.shown() {
+		if en.IsDir || filepath.Dir(en.Path) != dir {
 			continue
 		}
 		if en.Path == e.Path {
@@ -1282,6 +1287,9 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.remaining = !m.remaining
 	case key.Matches(msg, k.Tape):
 		m.toggleTape()
+	case key.Matches(msg, k.Search):
+		m.tab = tabLibrary
+		return m.startSearch()
 	case key.Matches(msg, k.Tab):
 		m.switchTab()
 	case msg.String() == "1":
