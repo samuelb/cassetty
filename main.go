@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samuelb/cassetty/internal/audio"
@@ -118,6 +119,15 @@ flags:
 		defer remote.Close()
 	}
 
+	// The state is saved on quitting, and while cassetty runs so that little
+	// is lost should it not get to quit. In silent mode nothing is saved.
+	var keep *keeper
+	var save func(config.State) error
+	if !*silent {
+		keep = &keeper{root: root}
+		save = keep.save
+	}
+
 	m, err := ui.Run(ui.Options{
 		Root:            root,
 		StartDir:        state.LastDir,
@@ -135,12 +145,41 @@ flags:
 		NowPlaying:      remote,
 		Notice:          notice,
 		Resume:          state.Playback,
+		Save:            save,
 	})
 	// Also after an error: the terminal may have gone away mid-session.
-	if !*silent {
-		_ = config.SaveState(root, m.State())
-	}
+	keep.finish(m.State())
 	return err
+}
+
+// keeper saves the state of the music folder at root. Its saves come from
+// the goroutines of the interface and, at the end, from the main one.
+type keeper struct {
+	root string
+	mu   sync.Mutex
+	done bool
+}
+
+// save stores s, unless the last save was made.
+func (k *keeper) save(s config.State) error {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.done {
+		return nil
+	}
+	return config.SaveState(k.root, s)
+}
+
+// finish stores s as the last word: a save still under way from the session
+// comes before it or not at all.
+func (k *keeper) finish(s config.State) {
+	if k == nil {
+		return
+	}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.done = true
+	_ = config.SaveState(k.root, s)
 }
 
 // checkTheme accepts a known theme name, or "" for none.

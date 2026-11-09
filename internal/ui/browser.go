@@ -333,7 +333,7 @@ func (m *Model) handlePlaylistKey(msg tea.KeyPressMsg) tea.Cmd {
 	case key.Matches(msg, k.Clear):
 		if len(m.playlist) > 0 {
 			m.playlist = nil
-			m.resetOrder()
+			m.edited()
 			m.plCursor, m.plOffset = 0, 0
 			m.setFlash("playlist cleared", false)
 		}

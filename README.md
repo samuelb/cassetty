@@ -206,7 +206,9 @@ the track and the last folder are remembered for each music folder by
 itself, so a start on another folder leaves those of your library alone.
 That state lives in `~/.local/state/cassetty/state.json` (or
 `$XDG_STATE_HOME/cassetty/state.json`) and is saved when cassetty quits,
-also when its terminal window is closed.
+also when its terminal window is closed. It is saved a moment after it
+changes, too, and once a minute while a track plays, so that little is lost
+should cassetty not get to quit.
 
 ## Development
 

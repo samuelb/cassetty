@@ -75,6 +75,9 @@ type Options struct {
 	NowPlaying      *nowplaying.Session // media keys; nil where unsupported
 	Notice          string              // shown once at startup
 	Resume          config.Playback     // where the last run left off
+	// Save stores the state while cassetty runs, so that it is not lost
+	// should cassetty not get to quit; nil keeps it to the caller, see State.
+	Save func(config.State) error
 }
 
 // Model is the root bubbletea model.
@@ -125,6 +128,12 @@ type Model struct {
 	// position in it
 	resuming *Track
 	resumeAt time.Duration
+
+	// saving the state while running, see keepState
+	edits   int       // changes to the playlist so far
+	stored  stateMark // of the state as it was saved last
+	saveDue bool      // a save is scheduled
+	saving  bool      // a save is under way
 
 	// animation
 	tickID         int
@@ -209,6 +218,7 @@ func New(opts Options) *Model {
 		}
 	}
 	m.restore(opts.Resume)
+	m.stored = m.mark() // as the caller has it stored
 	m.engine.SetVolume(float64(m.volume) / 100)
 	m.engine.SetTape(m.tape)
 	if opts.Notice != "" {
@@ -487,7 +497,7 @@ func (m *Model) animate(dt float64) {
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	_, cmd := m.update(msg)
 	m.syncNowPlaying()
-	return m, tea.Batch(cmd, m.queueNext())
+	return m, tea.Batch(cmd, m.queueNext(), m.keepState())
 }
 
 func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -550,6 +560,13 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case remoteMsg:
 		return m, tea.Batch(m.waitRemote(), m.handleRemote(nowplaying.Command(msg)))
+
+	case saveMsg:
+		return m, m.saveState()
+
+	case savedMsg:
+		m.saving, m.stored = false, msg.mark
+		return m, nil
 
 	case tea.KeyPressMsg:
 		return m, m.handleKey(msg)
@@ -935,6 +952,12 @@ func (m *Model) prev() tea.Cmd {
 // resetOrder drops the shuffled order, which is drawn anew when needed.
 func (m *Model) resetOrder() { m.order, m.nextOrder = nil, nil }
 
+// edited is called after every change to the playlist.
+func (m *Model) edited() {
+	m.resetOrder()
+	m.edits++
+}
+
 func (m *Model) reshuffle() {
 	m.nextOrder = nil
 	m.order = rand.Perm(len(m.playlist))
@@ -1083,7 +1106,7 @@ func (m *Model) readMeta(tracks []*Track) tea.Cmd {
 // replacePlaylist swaps in a new playlist and starts playing track start.
 func (m *Model) replacePlaylist(tracks []*Track, start int) tea.Cmd {
 	m.playlist = tracks
-	m.resetOrder()
+	m.edited()
 	m.curHint = -1
 	m.plCursor, m.plOffset = start, 0
 	m.failures = 0
@@ -1095,7 +1118,7 @@ func (m *Model) appendTracks(tracks []*Track) tea.Cmd {
 		return nil
 	}
 	m.playlist = append(m.playlist, tracks...)
-	m.resetOrder()
+	m.edited()
 	cmds := []tea.Cmd{m.readMeta(tracks)}
 	if m.src == nil && !m.loading {
 		// An empty deck: insert the tape, ready to play.
@@ -1164,7 +1187,7 @@ func (m *Model) removeFromPlaylist(i int) {
 		m.curHint = c - 1
 	}
 	m.playlist = slices.Delete(m.playlist, i, i+1)
-	m.resetOrder()
+	m.edited()
 	m.plCursor = min(m.plCursor, max(0, len(m.playlist)-1))
 }
 
@@ -1174,7 +1197,7 @@ func (m *Model) movePlaylist(i, d int) {
 		return
 	}
 	m.playlist[i], m.playlist[j] = m.playlist[j], m.playlist[i]
-	m.resetOrder()
+	m.edited()
 	m.plCursor = j
 }
 
