@@ -5,9 +5,12 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/gopxl/beep/v2"
 )
 
 // writeWAV writes a 16 bit stereo sine wave.
@@ -271,4 +274,83 @@ func TestDeckStopsWhenTheQueueIsCleared(t *testing.T) {
 	if e.Speed() != 0 {
 		t.Fatal("the deck plays on without a queued track")
 	}
+}
+
+// stalledStream is a decoder whose read does not return until it is
+// released, like one reading from a disk that has to spin up first.
+type stalledStream struct {
+	entered chan struct{} // closed once a read is under way
+	release chan struct{}
+	once    sync.Once
+	pos     int
+}
+
+func (s *stalledStream) Stream(p [][2]float64) (int, bool) {
+	s.once.Do(func() { close(s.entered) })
+	<-s.release
+	clear(p)
+	s.pos += len(p)
+	return len(p), true
+}
+func (s *stalledStream) Err() error     { return nil }
+func (s *stalledStream) Len() int       { return 1 << 30 }
+func (s *stalledStream) Position() int  { return s.pos }
+func (s *stalledStream) Seek(int) error { return nil }
+func (s *stalledStream) Close() error   { return nil }
+
+// stalledEngine returns an engine whose output is held up in a read of the
+// loaded track until release is closed; pulled is closed once it returned.
+func stalledEngine(t *testing.T) (e *Engine, release chan struct{}, pulled chan struct{}) {
+	t.Helper()
+	st := &stalledStream{entered: make(chan struct{}), release: make(chan struct{})}
+	src := &Source{stream: st, format: beep.Format{SampleRate: SampleRate, NumChannels: 2, Precision: 2}}
+	e = newTestEngine()
+	e.Start(src, true)
+	pulled = make(chan struct{})
+	go func() {
+		e.deck.Stream(make([][2]float64, 256))
+		close(pulled)
+	}()
+	<-st.entered
+	return e, st.release, pulled
+}
+
+func TestAStalledReadDoesNotHoldUpThePlayer(t *testing.T) {
+	e, release, pulled := stalledEngine(t)
+
+	// What the player asks for on every frame must not wait for the read.
+	asked := make(chan struct{})
+	go func() {
+		e.Position()
+		e.Speed()
+		e.Ended()
+		e.SetVolume(0.5)
+		e.Snapshot(make([][2]float64, 64))
+		close(asked)
+	}()
+	select {
+	case <-asked:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the engine does not answer while a read is stalled")
+	}
+	if e.Speed() != 1 {
+		t.Errorf("speed %v while a read is stalled, want the tape still running", e.Speed())
+	}
+
+	close(release)
+	<-pulled
+	if p := e.Position(); p <= 0 {
+		t.Errorf("position %v after the read returned", p)
+	}
+}
+
+func TestAStalledReadDoesNotHoldUpQuitting(t *testing.T) {
+	e, release, pulled := stalledEngine(t)
+	began := time.Now()
+	e.Close()
+	if took := time.Since(began); took > 4*closeTimeout {
+		t.Errorf("closing the engine took %v while a read is stalled", took)
+	}
+	close(release)
+	<-pulled
 }

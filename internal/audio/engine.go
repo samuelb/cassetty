@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ebitengine/oto/v3"
@@ -27,6 +28,10 @@ const idleSuspendDelay = time.Second
 
 // Engine owns the audio output and the deck that is permanently attached to
 // it. All methods are safe for concurrent use.
+//
+// Position, Speed, Ended, SetVolume and Snapshot return at once, also while
+// the output is held up reading a track from a disk that takes its time.
+// The methods that change what plays wait for such a read to return.
 type Engine struct {
 	deck    *deck
 	events  chan Event
@@ -82,8 +87,25 @@ func NewEngine(silent bool) (e *Engine, initErr error) {
 // Silent reports whether the engine is running without a sound device.
 func (e *Engine) Silent() bool { return e.silent }
 
-// Close stops the output.
+// closeTimeout is how long Close waits for the output to let go of the deck.
+const closeTimeout = 500 * time.Millisecond
+
+// Close stops the output. An output that is held up reading from a disk is
+// left behind after closeTimeout: Close is called when cassetty quits, which
+// must not take as long as the disk does.
 func (e *Engine) Close() {
+	done := make(chan struct{})
+	go func() {
+		e.close()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(closeTimeout):
+	}
+}
+
+func (e *Engine) close() {
 	if e.done != nil {
 		close(e.done)
 	}
@@ -96,6 +118,7 @@ func (e *Engine) Close() {
 	src, next := e.deck.src, e.deck.next
 	e.deck.src, e.deck.stream = nil, nil
 	e.deck.next, e.deck.nextStream = nil, nil
+	e.deck.publish()
 	e.deck.mu.Unlock()
 	src.Close()
 	next.Close()
@@ -127,6 +150,7 @@ func (e *Engine) Start(src *Source, play bool) uint64 {
 	if src != nil {
 		d.tape.load(src.Tape())
 	}
+	d.publish()
 	d.mu.Unlock()
 	d.changed()
 	if old != src {
@@ -173,6 +197,7 @@ func (e *Engine) Eject() {
 	d.playing = false
 	d.tape.motor = 0
 	d.tape.reset()
+	d.publish()
 	d.mu.Unlock()
 	d.changed()
 	old.Close()
@@ -185,6 +210,7 @@ func (e *Engine) Eject() {
 func (e *Engine) SetPlaying(play bool) {
 	e.deck.mu.Lock()
 	e.deck.setPlaying(play)
+	e.deck.publish()
 	e.deck.mu.Unlock()
 	e.deck.changed()
 }
@@ -197,6 +223,7 @@ func (e *Engine) SetTape(on bool) {
 	d.mu.Lock()
 	d.tape.setOn(on)
 	d.setPlaying(d.playing) // without the tape sound the motor no longer eases
+	d.publish()
 	d.mu.Unlock()
 	d.changed()
 }
@@ -204,24 +231,13 @@ func (e *Engine) SetTape(on bool) {
 // Speed returns how fast the tape moves: 0 when it stands still, 1 when it
 // plays, and in between while it winds up or down.
 func (e *Engine) Speed() float64 {
-	d := e.deck
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.idle() {
-		return 0
-	}
-	return d.tape.motor
+	return math.Float64frombits(e.deck.speed.Load())
 }
 
 // Ended reports whether the loaded track has played to its end, with no
 // queued track to roll on to: the deck stands still until it is told to
 // seek or to start another track.
-func (e *Engine) Ended() bool {
-	d := e.deck
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.stream != nil && d.ended
-}
+func (e *Engine) Ended() bool { return e.deck.over.Load() }
 
 // Seek moves the play head of the loaded track to t.
 func (e *Engine) Seek(t time.Duration) error {
@@ -241,28 +257,21 @@ func (e *Engine) Seek(t time.Duration) error {
 	if !d.playing {
 		d.tape.motor = 0 // the tape winding down must not play the new position
 	}
+	d.publish()
 	d.changed()
 	return nil
 }
 
 // Position returns the play head position of the loaded track.
 func (e *Engine) Position() time.Duration {
-	d := e.deck
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.src == nil {
-		return 0
-	}
-	return d.src.format.SampleRate.D(d.src.stream.Position())
+	return time.Duration(e.deck.pos.Load())
 }
 
 // SetVolume sets the output volume; v is a linear slider value in [0, 1]
 // that is mapped onto a perceptual (squared) gain curve.
 func (e *Engine) SetVolume(v float64) {
 	v = max(0, min(1, v))
-	e.deck.mu.Lock()
-	e.deck.gain = v * v
-	e.deck.mu.Unlock()
+	e.deck.gain.Store(math.Float64bits(v * v))
 }
 
 // Snapshot copies the most recently played frames into dst, compensating
@@ -310,7 +319,6 @@ type deck struct {
 	seq     uint64 // the last generation handed out
 	playing bool
 	ended   bool
-	gain    float64
 	events  chan<- Event
 	tap     *tap
 	wake    chan struct{} // signalled whenever idle may have changed
@@ -321,12 +329,39 @@ type deck struct {
 	next       *Source
 	nextStream beep.Streamer
 	nextGen    uint64
+
+	// What the player reads on every frame it draws is kept outside mu,
+	// which the output holds while it reads from the decoder: on a disk
+	// that spins up or a network share that hangs, such a read takes
+	// seconds, and the player must not stand still for it. See publish.
+	pos   atomic.Int64  // play head of the loaded track, a time.Duration
+	speed atomic.Uint64 // tape speed, a float64, see Engine.Speed
+	over  atomic.Bool   // see Engine.Ended
+	gain  atomic.Uint64 // output gain, a float64
 }
 
 func newDeck(events chan<- Event) *deck {
-	d := &deck{gain: 1, events: events, tap: newTap(1 << 15), wake: make(chan struct{}, 1), tape: newTransport()}
+	d := &deck{events: events, tap: newTap(1 << 15), wake: make(chan struct{}, 1), tape: newTransport()}
+	d.gain.Store(math.Float64bits(1))
 	d.pull = d.fill
 	return d
+}
+
+// publish makes the play head, the tape speed and the end of the track
+// known to the methods of Engine that do not wait for d.mu. Whatever
+// changes one of them calls it; the caller must hold d.mu.
+func (d *deck) publish() {
+	var pos time.Duration
+	if d.src != nil {
+		pos = d.src.format.SampleRate.D(d.src.stream.Position())
+	}
+	d.pos.Store(int64(pos))
+	speed := 0.0
+	if !d.idle() {
+		speed = d.tape.motor
+	}
+	d.speed.Store(math.Float64bits(speed))
+	d.over.Store(d.stream != nil && d.ended)
 }
 
 // idle reports whether the deck has nothing to play and emits silence.
@@ -409,12 +444,14 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 	n := d.tape.process(samples, d.playing, d.pull)
 	if n > 0 {
 		d.tap.write(samples[:n])
+		gain := math.Float64frombits(d.gain.Load())
 		for i := range samples[:n] {
-			samples[i][0] *= d.gain
-			samples[i][1] *= d.gain
+			samples[i][0] *= gain
+			samples[i][1] *= gain
 		}
 	}
 	clear(samples[n:])
+	d.publish()
 	if !d.playing && d.tape.motor == 0 {
 		d.changed() // the tape has wound down, so the output can be suspended
 	}
