@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	zone "github.com/lrstanley/bubblezone/v2"
 )
 
@@ -235,7 +236,7 @@ func (m *Model) lcdFlags(lb *lineBuf, w int) {
 	lb.raw(zone.Mark("repeat", st(m.repeat != repeatOff).Render(rep)), len([]rune(rep)))
 }
 
-// marqueeText returns the Winamp style scrolling title, w cells wide.
+// marqueeText returns the Winamp style scrolling title, in at most w cells.
 func (m *Model) marqueeText(w int) string {
 	if m.src == nil {
 		return truncate("cassetty · insert a tape to begin", w)
@@ -247,17 +248,59 @@ func (m *Model) marqueeText(w int) string {
 	if m.src.Length > 0 {
 		title += " (" + fmtDur(m.src.Length) + ")"
 	}
-	r := []rune(title)
-	if len(r) <= w {
+	if ansi.StringWidth(title) <= w {
 		return title
 	}
-	loop := append(r, []rune("  ***  ")...)
-	off := int(m.marquee) % len(loop)
-	out := make([]rune, 0, w)
-	for i := 0; i < w; i++ {
-		out = append(out, loop[(off+i)%len(loop)])
+	return scroll(title+"  ***  ", int(m.marquee), w)
+}
+
+// scroll returns w cells of s going round without end, from off cells into
+// it. It goes by cells, not by characters: those of Chinese, Japanese and
+// Korean and most emoji take two. One that either edge cuts in half shows
+// as a blank, so that the text moves on cell by cell.
+func scroll(s string, off, w int) string {
+	type cluster struct {
+		text  string
+		width int
 	}
-	return string(out)
+	var loop []cluster
+	total := 0
+	for rest := s; rest != ""; {
+		text, width := ansi.FirstGraphemeCluster(rest, ansi.GraphemeWidth)
+		if text == "" {
+			break
+		}
+		rest = rest[len(text):]
+		loop = append(loop, cluster{text, width})
+		total += width
+	}
+	if total <= 0 || w <= 0 {
+		return ""
+	}
+	off %= total
+	i, at := 0, 0 // the cluster the window starts in, and the cell it starts at
+	for at+loop[i].width <= off {
+		at += loop[i].width
+		i++
+	}
+	var b strings.Builder
+	filled := 0
+	if at < off {
+		filled = min(w, at+loop[i].width-off)
+		b.WriteString(strings.Repeat(" ", filled))
+		i++
+	}
+	for filled < w {
+		c := loop[i%len(loop)]
+		if filled+c.width > w {
+			b.WriteString(strings.Repeat(" ", w-filled))
+			break
+		}
+		b.WriteString(c.text)
+		filled += c.width
+		i++
+	}
+	return b.String()
 }
 
 var barChars = []string{" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"}
