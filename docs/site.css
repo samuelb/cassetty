@@ -334,9 +334,9 @@ code { padding: 1px 6px; border-radius: 3px; background: var(--sel); color: var(
   mask-composite: add, exclude, exclude, add;
 }
 .printout {
-  --paper: #eadcbd;
-  --green: #d3dbb8;
-  --ink: color-mix(in srgb, var(--label-text) 82%, #7a6a55);
+  --paper: #efe6cf;
+  --green: #d4e2c2;
+  --ink: color-mix(in srgb, var(--label-text) 90%, #7a6a55);
   --ring: 240px;
   --ring-at: right 16% top 30px;
   --perf: rgba(70, 60, 45, .3);
@@ -360,7 +360,7 @@ code { padding: 1px 6px; border-radius: 3px; background: var(--sel); color: var(
     linear-gradient(var(--green) 50%, transparent 0) var(--strip) var(--top) / calc(100% - var(--strip) * 2) calc(var(--line) * 4) repeat-y,
     var(--paper);
   /* Yellowed from the edges in. */
-  box-shadow: inset 0 0 44px rgba(150, 95, 25, .38), inset 0 0 8px 1px rgba(120, 70, 15, .35);
+  box-shadow: inset 0 0 36px rgba(150, 100, 30, .2), inset 0 0 6px rgba(120, 75, 20, .2);
   /* Torn off along a perforation at the top and bottom, the corner folded away. */
   mask:
     linear-gradient(225deg, transparent calc(var(--ear) / 1.4142), #000 0),
@@ -378,11 +378,11 @@ code { padding: 1px 6px; border-radius: 3px; background: var(--sel); color: var(
   pointer-events: none;
   mix-blend-mode: multiply;
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='r' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='2' seed='3'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='16'/%3E%3CfeGaussianBlur stdDeviation='.7'/%3E%3C/filter%3E%3Cg filter='url(%23r)' fill='none'%3E%3Ccircle cx='150' cy='150' r='112' fill='rgb(175,120,50)' fill-opacity='.06'/%3E%3Ccircle cx='150' cy='150' r='108' stroke='rgb(160,105,40)' stroke-opacity='.12' stroke-width='9'/%3E%3Ccircle cx='150' cy='150' r='112' stroke='rgb(120,72,22)' stroke-opacity='.32' stroke-width='2.2'/%3E%3Ccircle cx='166' cy='132' r='112' stroke='rgb(120,72,22)' stroke-opacity='.3' stroke-width='1.6' stroke-dasharray='260 444' stroke-dashoffset='-40'/%3E%3C/g%3E%3C/svg%3E") var(--ring-at) / var(--ring) var(--ring) no-repeat,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='300'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.06' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .34 0 0 0 0 .14 5 0 0 0 -3.75'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E") 0 0 / 420px 300px,
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1100' height='480'%3E%3Cfilter id='b' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.006 .01' numOctaves='3' seed='29'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .42 0 0 0 0 .16 1.6 0 0 0 -.62'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E") center / cover no-repeat,
-    linear-gradient(97deg, transparent calc(52% - 1px), rgba(110, 80, 30, .16) 52%, rgba(255, 250, 235, .5) calc(52% + 1px), transparent calc(52% + 6px)),
-    linear-gradient(100deg, rgba(200, 150, 70, .16), transparent 35% 70%, rgba(200, 150, 70, .2));
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='r' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.018' numOctaves='2' seed='3'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='16'/%3E%3CfeGaussianBlur stdDeviation='.7'/%3E%3C/filter%3E%3Cg filter='url(%23r)' fill='none'%3E%3Ccircle cx='150' cy='150' r='112' fill='rgb(175,120,50)' fill-opacity='.04'/%3E%3Ccircle cx='150' cy='150' r='108' stroke='rgb(160,105,40)' stroke-opacity='.07' stroke-width='9'/%3E%3Ccircle cx='150' cy='150' r='112' stroke='rgb(120,72,22)' stroke-opacity='.2' stroke-width='2.2'/%3E%3Ccircle cx='166' cy='132' r='112' stroke='rgb(120,72,22)' stroke-opacity='.15' stroke-width='1.6' stroke-dasharray='260 444' stroke-dashoffset='-40'/%3E%3C/g%3E%3C/svg%3E") var(--ring-at) / var(--ring) var(--ring) no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='300'%3E%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.06' numOctaves='3' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .55 0 0 0 0 .34 0 0 0 0 .14 5 0 0 0 -3.95'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E") 0 0 / 420px 300px,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1100' height='480'%3E%3Cfilter id='b' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.006 .01' numOctaves='3' seed='29'/%3E%3CfeColorMatrix values='0 0 0 0 .62 0 0 0 0 .42 0 0 0 0 .16 .9 0 0 0 -.38'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E") center / cover no-repeat,
+    linear-gradient(97deg, transparent calc(52% - 1px), rgba(110, 80, 30, .12) 52%, rgba(255, 250, 235, .4) calc(52% + 1px), transparent calc(52% + 6px)),
+    linear-gradient(100deg, rgba(200, 150, 70, .08), transparent 35% 70%, rgba(200, 150, 70, .1));
 }
 /* The dog-ear: the corner's plain back, its feed hole and perforation mirrored. */
 .printout::after {
@@ -393,13 +393,13 @@ code { padding: 1px 6px; border-radius: 3px; background: var(--sel); color: var(
   width: var(--ear);
   height: var(--ear);
   background:
-    radial-gradient(circle at calc(var(--line) / 2) calc(var(--ear) - var(--strip) / 2), #d3c6a4 calc(var(--r) - .5px), rgba(70, 60, 45, .3) var(--r), transparent calc(var(--r) + 1.5px)),
+    radial-gradient(circle at calc(var(--line) / 2) calc(var(--ear) - var(--strip) / 2), #dbd1b8 calc(var(--r) - .5px), rgba(70, 60, 45, .3) var(--r), transparent calc(var(--r) + 1.5px)),
     repeating-linear-gradient(to right, var(--perf) 0 4px, transparent 4px 7px) 0 calc(var(--ear) - var(--strip)) / calc(var(--ear) - var(--strip)) 1px no-repeat,
-    linear-gradient(to top right, #c9b68c, #e6d8b6 50%, transparent 0);
+    linear-gradient(to top right, #d3c6a6, #ece3cc 50%, transparent 0);
   filter: drop-shadow(-2px 3px 2px rgba(40, 30, 15, .3));
 }
 /* A worn ribbon prints unevenly. */
-.printout ul { margin: 0; padding: 0; list-style: none; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09 .35' numOctaves='3' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.4 0 0 0 2.3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E") 0 0 / 240px 240px; }
+.printout ul { margin: 0; padding: 0; list-style: none; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09 .35' numOctaves='3' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.4 0 0 0 1.85'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E") 0 0 / 240px 240px; }
 .printout li { display: flex; align-items: baseline; gap: 6px; height: var(--line); padding: 5px 0; font-size: 14px; }
 .printout li i { flex: 1; min-width: 12px; margin: 0 4px; border-bottom: 2px dotted var(--label-muted); opacity: .45; transform: translateY(-4px); }
 .printout kbd { color: var(--ink); background: transparent; border-color: var(--label-muted); box-shadow: none; }
