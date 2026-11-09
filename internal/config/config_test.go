@@ -81,3 +81,53 @@ func TestSampleIsDefault(t *testing.T) {
 		t.Fatalf("the sample config loads as %+v, want the defaults %+v", got, want)
 	}
 }
+
+func TestSaveStateLeavesNoHalfWrittenFile(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", home)
+	dir := filepath.Dir(statePath())
+	old := State{Theme: "amber", Playback: Playback{Playlist: []string{"/music/1.mp3"}, Track: "/music/1.mp3"}}
+	if err := SaveState(old); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveState(old); err != nil { // over a file that is there
+		t.Fatal(err)
+	}
+	if names := dirNames(t, dir); !reflect.DeepEqual(names, []string{"state.json"}) {
+		t.Fatalf("the state folder holds %q, want state.json alone", names)
+	}
+	if fi, err := os.Stat(statePath()); err != nil || fi.Mode().Perm() != 0o644 {
+		t.Fatalf("state file: %v, mode %v", err, fi.Mode().Perm())
+	}
+
+	// A save that fails leaves the state as it was, and nothing behind.
+	if os.Getuid() == 0 {
+		t.Skip("root writes to a read-only folder")
+	}
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0o755)
+	if err := SaveState(State{Theme: "vfd"}); err == nil {
+		t.Fatal("saving into a read-only folder reported no error")
+	}
+	if got := LoadState(); !reflect.DeepEqual(got, old) {
+		t.Fatalf("after a failed save the state is %+v, want %+v", got, old)
+	}
+	if names := dirNames(t, dir); !reflect.DeepEqual(names, []string{"state.json"}) {
+		t.Fatalf("the failed save left %q behind", names)
+	}
+}
+
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	des, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, de := range des {
+		names = append(names, de.Name())
+	}
+	return names
+}

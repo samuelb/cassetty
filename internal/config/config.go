@@ -154,15 +154,47 @@ func LoadState() State {
 
 // SaveState persists s.
 func SaveState(s State) error {
-	p := statePath()
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		return err
-	}
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, b, 0o644)
+	return writeFile(statePath(), b)
+}
+
+// writeFile puts data in the file at path in one step: it is written to a
+// file next to it, which then takes its place. Whatever happens on the way,
+// a full disk or the end of the process, the file at path is the old one or
+// the new one, never the start of one.
+func writeFile(path string, data []byte) (err error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	f, err := os.CreateTemp(dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			f.Close()
+			os.Remove(f.Name())
+		}
+	}()
+	if _, err = f.Write(data); err != nil {
+		return err
+	}
+	if err = f.Chmod(0o644); err != nil {
+		return err
+	}
+	// On the disk before it takes the place of the old file: a rename may
+	// outlive a power cut that the data does not.
+	if err = f.Sync(); err != nil {
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), path)
 }
 
 // DefaultMusicDir is the library root used when neither the command line nor
