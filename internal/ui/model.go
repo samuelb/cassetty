@@ -106,7 +106,8 @@ type Model struct {
 	repeat    repeatMode
 	loadSeq   int
 	loading   bool
-	failures  int
+	failures  int // tracks in a row that could not be opened
+	broken    int // tracks in a row that broke off while playing
 	remaining bool
 	tape      bool // the tape sound is on
 
@@ -535,14 +536,7 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case audioEventMsg:
 		cmds := []tea.Cmd{m.waitAudio()}
 		if msg.Gen == m.gen && !m.loading {
-			if msg.Err != nil {
-				m.setFlash("playback error: "+msg.Err.Error(), true)
-			}
-			if msg.Next != 0 && msg.Next == m.queue.gen {
-				cmds = append(cmds, m.advance())
-			} else {
-				cmds = append(cmds, m.trackEnded())
-			}
+			cmds = append(cmds, m.trackOver(audio.Event(msg)))
 		}
 		return m, tea.Batch(cmds...)
 
@@ -832,6 +826,41 @@ func (m *Model) seekBy(d time.Duration) tea.Cmd {
 		m.spin = -6
 	}
 	return m.kickTick()
+}
+
+// trackOver follows the deck once the loaded track is over: it played to its
+// end, or broke off with an error, as a damaged file does.
+func (m *Model) trackOver(ev audio.Event) tea.Cmd {
+	broke := m.cur
+	if ev.Err == nil {
+		broke, m.broken = nil, 0
+	} else {
+		m.broken++
+	}
+	// A track that broke off is not repeated, and when all of them do the
+	// deck stops rather than go round the playlist for good.
+	giveUp := ev.Err != nil && (m.repeat == repeatOne || m.broken >= len(m.playlist))
+	var cmd tea.Cmd
+	switch {
+	case ev.Next != 0 && ev.Next == m.queue.gen:
+		cmd = m.advance() // the deck plays the queued track already
+		if giveUp {
+			cmd = tea.Batch(cmd, m.stop())
+		}
+	case giveUp:
+		cmd = m.stop()
+	default:
+		cmd = m.trackEnded()
+	}
+	if ev.Err != nil {
+		name := "playback"
+		if broke != nil {
+			broke.Failed = true
+			name = trackName(broke.Path)
+		}
+		m.setFlash(name+": "+ev.Err.Error(), true)
+	}
+	return cmd
 }
 
 func (m *Model) trackEnded() tea.Cmd {

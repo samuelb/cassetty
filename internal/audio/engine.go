@@ -109,13 +109,14 @@ func (e *Engine) Events() <-chan Event { return e.events }
 // the new track, which is carried by the matching end-of-track Event.
 func (e *Engine) Start(src *Source, play bool) uint64 {
 	d := e.deck
+	stream := wrapStream(src) // before locking: it panics on a source nothing plays from
 	d.mu.Lock()
 	old, queued := d.src, d.next
 	d.seq++
 	d.gen = d.seq
 	gen := d.gen
 	d.src = src
-	d.stream = wrapStream(src)
+	d.stream = stream
 	d.next, d.nextStream, d.nextGen = nil, nil, 0
 	d.setPlaying(play)
 	if !play {
@@ -144,9 +145,10 @@ func (e *Engine) Start(src *Source, play bool) uint64 {
 // It returns the generation src will play as.
 func (e *Engine) Queue(src *Source) uint64 {
 	d := e.deck
+	stream := wrapStream(src) // before locking, as in Start
 	d.mu.Lock()
 	old := d.next
-	d.next, d.nextStream, d.nextGen = src, wrapStream(src), 0
+	d.next, d.nextStream, d.nextGen = src, stream, 0
 	if src != nil {
 		d.seq++
 		d.nextGen = d.seq
@@ -219,14 +221,7 @@ func (e *Engine) Seek(t time.Duration) error {
 	if d.src == nil {
 		return errNoSource
 	}
-	n := d.src.format.SampleRate.N(t)
-	if n < 0 {
-		n = 0
-	}
-	if l := d.src.stream.Len(); l > 0 && n >= l {
-		n = l - 1
-	}
-	if err := d.src.stream.Seek(n); err != nil {
+	if err := d.src.seek(t); err != nil {
 		return err
 	}
 	// Recreate the resampler so no stale samples from before the seek play.
@@ -264,6 +259,24 @@ func (e *Engine) SetVolume(v float64) {
 // for the output latency so the visualizers line up with what is audible.
 func (e *Engine) Snapshot(dst [][2]float64) {
 	e.deck.tap.read(dst, e.latency)
+}
+
+// seek moves the decoder to t. A decoder that panics, as some do on a
+// damaged file, fails to seek.
+func (s *Source) seek(t time.Duration) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = damaged(r)
+		}
+	}()
+	n := s.format.SampleRate.N(t)
+	if n < 0 {
+		n = 0
+	}
+	if l := s.stream.Len(); l > 0 && n >= l {
+		n = l - 1
+	}
+	return s.stream.Seek(n)
 }
 
 // wrapStream returns the source stream converted to the output sample rate.
@@ -406,12 +419,14 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 func (d *deck) fill(samples [][2]float64) int {
 	n := 0
 	for n < len(samples) && !d.ended {
-		k, ok := d.stream.Stream(samples[n:])
+		k, ok, err := d.read(samples[n:])
 		n += k
 		if ok && k > 0 {
 			continue // a short read is followed by (0, false) at the end
 		}
-		err := d.stream.Err()
+		if err == nil {
+			err = d.stream.Err()
+		}
 		if err == nil && d.src != nil {
 			err = d.src.stream.Err()
 		}
@@ -433,6 +448,21 @@ func (d *deck) fill(samples [][2]float64) int {
 		}
 	}
 	return n
+}
+
+// read streams the loaded track into samples, like its Stream. The decoders
+// are not hardened against every damaged file, and a panic of theirs here,
+// on the goroutine of the output, would end cassetty on the spot and leave
+// the terminal as it is: it ends the track with an error instead. The caller
+// must hold d.mu.
+func (d *deck) read(samples [][2]float64) (n int, ok bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			n, ok, err = 0, false, damaged(r)
+		}
+	}()
+	n, ok = d.stream.Stream(samples)
+	return n, ok, nil
 }
 
 func (d *deck) Err() error { return nil }
