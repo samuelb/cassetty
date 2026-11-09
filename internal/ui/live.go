@@ -76,9 +76,9 @@ func (m *Model) scheduleRefresh(d time.Duration) tea.Cmd {
 
 // reloadDir re-reads the shown folder, keeping selection and scroll position.
 func (m *Model) reloadDir() tea.Cmd {
-	dir, formats, hidden := m.dir, m.opts.Formats, m.opts.ShowHidden
+	root, dir, formats, hidden := m.root, m.dir, m.opts.Formats, m.opts.ShowHidden
 	return func() tea.Msg {
-		entries, err := library.ReadDir(dir, formats, hidden)
+		entries, err := readDir(root, dir, formats, hidden)
 		return dirMsg{dir: dir, entries: entries, err: err, refresh: true}
 	}
 }

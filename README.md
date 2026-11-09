@@ -99,7 +99,8 @@ cassetty [flags] [music folder]
 
 The folder argument wins over the config file; without either cassetty opens
 `~/Music`, or the current folder if there is no `~/Music`. The browser never
-leaves that root folder.
+leaves that root folder. Every folder below it lists `..` first, which goes
+up a folder like `backspace` does.
 
 ## Keys
 

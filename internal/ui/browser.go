@@ -17,11 +17,46 @@ import (
 // --- library navigation ----------------------------------------------------
 
 func (m *Model) loadDir(dir, focus string) tea.Cmd {
-	formats, hidden := m.opts.Formats, m.opts.ShowHidden
+	root, formats, hidden := m.root, m.opts.Formats, m.opts.ShowHidden
 	return func() tea.Msg {
-		entries, err := library.ReadDir(dir, formats, hidden)
+		entries, err := readDir(root, dir, formats, hidden)
 		return dirMsg{dir: dir, entries: entries, err: err, focus: focus}
 	}
+}
+
+// parentName names the entry that leads to the folder above. No file or
+// folder on disk is called that.
+const parentName = ".."
+
+func isParent(e library.Entry) bool { return e.Name == parentName }
+
+// readDir lists dir for the browser: in a folder below the root, the way to
+// the folder above comes first.
+func readDir(root, dir string, formats library.Formats, hidden bool) ([]library.Entry, error) {
+	entries, err := library.ReadDir(dir, formats, hidden)
+	if err != nil || dir == root || !within(root, dir) {
+		return entries, err
+	}
+	up := library.Entry{Name: parentName, Path: filepath.Dir(dir), IsDir: true}
+	return append([]library.Entry{up}, entries...), nil
+}
+
+// parentShown reports whether the list starts with the way to the folder
+// above. It does not while filtering or searching.
+func (m *Model) parentShown() bool {
+	return len(m.visible) > 0 && isParent(m.shown()[m.visible[0]])
+}
+
+// onParent reports whether the cursor is on the way to the folder above.
+func (m *Model) onParent() bool { return m.cursor == 0 && m.parentShown() }
+
+// firstRow is where the cursor goes in a list without a selection: on the
+// first entry rather than the way back, unless that is all there is.
+func (m *Model) firstRow() int {
+	if m.parentShown() && len(m.visible) > 1 {
+		return 1
+	}
+	return 0
 }
 
 func (m *Model) applyDir(msg dirMsg) tea.Cmd {
@@ -48,7 +83,7 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 	if focus == "" {
 		focus = m.memory[m.dir]
 	}
-	m.cursor, m.offset = 0, 0
+	m.cursor, m.offset = m.firstRow(), 0
 	for i, idx := range m.visible {
 		if m.entries[idx].Name == focus {
 			m.cursor = i
@@ -69,6 +104,9 @@ func (m *Model) refilter() {
 	}
 outer:
 	for i, e := range entries {
+		if len(terms) > 0 && isParent(e) {
+			continue // the way back matches no filter
+		}
 		var name string
 		if m.search.on {
 			name = m.search.keys[i]
@@ -86,8 +124,10 @@ outer:
 	m.ensureVisible()
 }
 
+// selectedEntry returns the folder or track under the cursor, which is none
+// on the way to the folder above.
 func (m *Model) selectedEntry() (library.Entry, bool) {
-	if m.cursor < 0 || m.cursor >= len(m.visible) {
+	if m.cursor < 0 || m.cursor >= len(m.visible) || m.onParent() {
 		return library.Entry{}, false
 	}
 	return m.shown()[m.visible[m.cursor]], true
@@ -120,8 +160,11 @@ func (m *Model) ensurePlaylistVisible() {
 }
 
 // open enters a folder or plays a file (the whole folder becomes the
-// playlist, starting at the file).
+// playlist, starting at the file). On the way back it goes up a folder.
 func (m *Model) open() tea.Cmd {
+	if m.onParent() {
+		return m.back()
+	}
 	e, ok := m.selectedEntry()
 	if !ok {
 		return nil
@@ -234,7 +277,7 @@ func (m *Model) handleFilterKey(msg tea.KeyPressMsg) tea.Cmd {
 		return m.startSearch()
 	case "enter":
 		m.filtering = false
-		if len(m.visible) == 1 {
+		if len(m.visible) == 1 && !m.parentShown() {
 			return m.open()
 		}
 		return nil
@@ -344,8 +387,16 @@ func (m *Model) renderBrowser(w, h int) string {
 		body = m.libraryRows(inner, rows)
 		p.total, p.offset, p.visible = len(m.visible), m.offset, rows
 		p.footL = m.filterLine()
-		if n := len(m.visible); n > 0 {
-			p.footR = fg(t.Muted).Render(fmt.Sprintf(" %d/%d ", m.cursor+1, n))
+		n, at := len(m.visible), m.cursor+1
+		if m.parentShown() { // the way back is not one of the entries
+			n, at = n-1, at-1
+		}
+		if n > 0 {
+			pos := fmt.Sprint(at)
+			if at == 0 {
+				pos = "–"
+			}
+			p.footR = fg(t.Muted).Render(fmt.Sprintf(" %s/%d ", pos, n))
 		}
 	default:
 		body = m.playlistRows(inner, rows)
@@ -542,6 +593,10 @@ func (m *Model) libraryRows(w, rows int) []string {
 		nameStyle := base.Foreground(t.Text)
 		iconStyle := base.Foreground(t.Muted)
 		switch {
+		case isParent(e):
+			icon = "◂"
+			iconStyle = base.Foreground(t.Accent2)
+			nameStyle = base.Foreground(t.Muted).Bold(true)
 		case e.IsDir:
 			icon = "▸"
 			iconStyle = base.Foreground(t.Accent2)
@@ -557,7 +612,7 @@ func (m *Model) libraryRows(w, rows int) []string {
 		}
 		lb.add(iconStyle, " "+icon+" ")
 		name := e.Name
-		if e.IsDir {
+		if e.IsDir && !isParent(e) {
 			name += "/"
 		}
 		nameW := w - lb.w - ansi.StringWidth(right) - 3
@@ -573,6 +628,11 @@ func (m *Model) libraryRows(w, rows int) []string {
 		lb.padTo(base, w-ansi.StringWidth(right)-2)
 		lb.add(base.Foreground(t.Faint), right).padTo(base, w)
 		out = append(out, lb.String())
+	}
+	if len(m.visible) == 1 && m.parentShown() && len(out) < rows {
+		// Nothing here but the way back.
+		out = append(out, m.emptyState(w, rows-len(out), fg(t.Muted),
+			"no audio files or folders here", "backspace goes to the parent folder")...)
 	}
 	return out
 }
