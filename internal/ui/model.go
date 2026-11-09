@@ -236,9 +236,8 @@ func (m *Model) State() config.State {
 		Shuffle: m.shuffle,
 		Repeat:  repeatNames[m.repeat],
 		Tape:    m.tape,
-		LastDir: m.dir,
 
-		Playback: m.playback(),
+		Session: config.Session{LastDir: m.dir, Playback: m.playback()},
 	}
 }
 

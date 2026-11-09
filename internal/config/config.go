@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -113,15 +114,21 @@ func WriteSample(path string) error {
 	return os.WriteFile(path, []byte(Sample), 0o644)
 }
 
-// State is remembered between runs.
+// State is remembered between runs: the settings, which every library
+// shares, and where the library in use was left.
 type State struct {
 	Volume  *int   `json:"volume,omitempty"`
 	Theme   string `json:"theme,omitempty"`
 	Shuffle bool   `json:"shuffle"`
 	Repeat  string `json:"repeat,omitempty"`
 	Tape    bool   `json:"tape"`
-	LastDir string `json:"last_dir,omitempty"`
 
+	Session
+}
+
+// Session is where a library was left: the folder shown, and playback.
+type Session struct {
+	LastDir  string   `json:"last_dir,omitempty"`
 	Playback Playback `json:"playback,omitzero"`
 }
 
@@ -139,26 +146,80 @@ type Playback struct {
 	Position float64 `json:"position,omitempty"`
 }
 
+// stateFile is the state as it is stored. The session at its top level is
+// from before every library had its own: it is that of whichever library
+// cassetty ran on last then, and stays until that library is saved again.
+type stateFile struct {
+	State
+	Libraries map[string]Session `json:"libraries,omitempty"`
+}
+
 func statePath() string {
 	return filepath.Join(xdgDir("XDG_STATE_HOME", ".local/state"), "cassetty", "state.json")
 }
 
-// LoadState reads the remembered state; errors yield an empty state.
-func LoadState() State {
-	var s State
+// readState reads the state file; errors yield an empty one.
+func readState() stateFile {
+	var f stateFile
 	if b, err := os.ReadFile(statePath()); err == nil {
-		_ = json.Unmarshal(b, &s)
+		_ = json.Unmarshal(b, &f)
+	}
+	return f
+}
+
+// LoadState reads the remembered state, with the session of the library at
+// root; errors yield an empty state. A library without a session of its own
+// gets the one from before every library had one: what of it lies outside
+// the library is for the caller to leave out.
+func LoadState(root string) State {
+	f := readState()
+	s := f.State
+	if session, ok := f.Libraries[filepath.Clean(root)]; ok {
+		s.Session = session
 	}
 	return s
 }
 
-// SaveState persists s.
-func SaveState(s State) error {
-	b, err := json.MarshalIndent(s, "", "  ")
+// SaveState persists s, with its session as that of the library at root.
+// The sessions of the other libraries stay as they are.
+func SaveState(root string, s State) error {
+	root = filepath.Clean(root)
+	f := readState()
+	old := f.Session
+	f.State = s
+	f.Session = Session{}
+	if !old.within(root) {
+		f.Session = old // of another library, which has not been saved since
+	}
+	if f.Libraries == nil {
+		f.Libraries = map[string]Session{}
+	}
+	f.Libraries[root] = s.Session
+	if s.Session.empty(root) {
+		delete(f.Libraries, root)
+	}
+	b, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
 		return err
 	}
 	return writeFile(statePath(), b)
+}
+
+// empty reports whether the session holds nothing worth keeping for the
+// library at root.
+func (s Session) empty(root string) bool {
+	return (s.LastDir == "" || filepath.Clean(s.LastDir) == root) &&
+		len(s.Playback.Playlist) == 0 && s.Playback.Track == ""
+}
+
+// within reports whether anything of the session lies in the library at
+// root, which makes it a session of that library.
+func (s Session) within(root string) bool {
+	in := func(path string) bool {
+		rel, err := filepath.Rel(root, path)
+		return path != "" && err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	}
+	return in(s.LastDir) || in(s.Playback.Track) || slices.ContainsFunc(s.Playback.Playlist, in)
 }
 
 // writeFile puts data in the file at path in one step: it is written to a

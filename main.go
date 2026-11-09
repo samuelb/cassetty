@@ -72,7 +72,6 @@ flags:
 	if err != nil {
 		return fmt.Errorf("config %s: %w", *cfgPath, err)
 	}
-	state := config.LoadState()
 
 	root := cfg.MusicDir
 	switch {
@@ -90,6 +89,8 @@ flags:
 	if err := ui.CheckRoot(root); err != nil {
 		return fmt.Errorf("%w\n  set music_dir in %s (cassetty -init-config creates one)\n  or pass a folder: cassetty ~/Music", err, *cfgPath)
 	}
+	// The settings, and where this music folder was left.
+	state := config.LoadState(root)
 
 	if err := checkTheme(*themeFlag); err != nil {
 		return err
@@ -137,7 +138,7 @@ flags:
 	})
 	// Also after an error: the terminal may have gone away mid-session.
 	if !*silent {
-		_ = config.SaveState(m.State())
+		_ = config.SaveState(root, m.State())
 	}
 	return err
 }
