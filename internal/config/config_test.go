@@ -67,3 +67,17 @@ func TestLoadLeavesMusicDirUnset(t *testing.T) {
 		t.Fatalf("MusicDir = %q, want empty", cfg.MusicDir)
 	}
 }
+
+func TestSampleIsDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := WriteSample(path); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := Default(); got != want {
+		t.Fatalf("the sample config loads as %+v, want the defaults %+v", got, want)
+	}
+}

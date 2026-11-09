@@ -123,6 +123,7 @@ flags:
 		Theme:           theme,
 		Volume:          volume,
 		ShowHidden:      cfg.ShowHidden,
+		NerdFont:        cfg.NerdFont,
 		Shuffle:         state.Shuffle,
 		Repeat:          state.Repeat,
 		Tape:            state.Tape,

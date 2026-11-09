@@ -72,6 +72,11 @@ No cgo is required, so cross compiling is a plain
 falls back to ALSA (`libasound.so.2`, loaded at runtime). Without a usable
 sound device cassetty starts in silent mode and tells you so.
 
+**Icons:** the browser draws its folder and track icons from a
+[Nerd Font](https://www.nerdfonts.com). If your terminal shows boxes or
+question marks in their place, set `nerd_font = false` in the
+[config](#configuration).
+
 ## Formats
 
 Decoded natively, no external tools needed: **MP3, FLAC, WAV, Ogg Vorbis**.
@@ -187,6 +192,7 @@ music_dir = "~/Music"      # root of the library (unset: ~/Music, else the curre
 theme = "sunbleached"      # always start in this theme (unset: the last one used)
 volume = 70                # initial volume in percent
 show_hidden = false        # list dot files and folders
+nerd_font = true           # browser icons from a Nerd Font (false: symbols every font has)
 paint_background = true    # paint the terminal background in the theme color (silverface always does)
 seek_step = 5              # seconds for ←/→ (shift = 6x)
 ```

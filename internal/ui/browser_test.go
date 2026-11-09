@@ -88,3 +88,26 @@ func TestParentFolderEntry(t *testing.T) {
 		t.Fatalf("enter in the empty folder went to %s", m.dir)
 	}
 }
+
+func TestBrowserIcons(t *testing.T) {
+	root := t.TempDir()
+	for _, p := range []string{"Artist/Album/01 One.mp3", "Artist/Single.flac"} {
+		touch(t, filepath.Join(root, p), 1)
+	}
+	for _, nerd := range []bool{false, true} {
+		m := newTestModel(t, root, func(o *Options) { o.NerdFont = nerd })
+		press(m, "enter")
+		want := plainIcons
+		if nerd {
+			want = nerdIcons
+		}
+		for _, w := range []int{72, 100} {
+			f := checkFrame(t, m, w, 30)
+			for _, row := range []string{want.parent + " ..", want.folder + " Album/", want.track + " Single.flac"} {
+				if !strings.Contains(f, row) {
+					t.Errorf("nerd font %v, %d wide: no %q in\n%s", nerd, w, row, f)
+				}
+			}
+		}
+	}
+}

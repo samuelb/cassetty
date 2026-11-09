@@ -26,6 +26,9 @@ type Config struct {
 	Volume int `toml:"volume"`
 	// ShowHidden lists dot files and dot folders.
 	ShowHidden bool `toml:"show_hidden"`
+	// NerdFont draws the icons of the browser from a Nerd Font; without it
+	// the browser uses symbols that every font has.
+	NerdFont bool `toml:"nerd_font"`
 	// PaintBackground sets the terminal background to the theme color.
 	PaintBackground bool `toml:"paint_background"`
 	// SeekStep is the seek distance in seconds for the arrow keys.
@@ -36,6 +39,7 @@ type Config struct {
 func Default() Config {
 	return Config{
 		Volume:          70,
+		NerdFont:        true,
 		PaintBackground: true,
 		SeekStep:        5,
 	}
@@ -84,6 +88,11 @@ volume = 70
 
 # List dot files and dot folders.
 show_hidden = false
+
+# Draw the folder and track icons of the browser from a Nerd Font
+# (https://www.nerdfonts.com). If they show as empty boxes or question marks,
+# your terminal has no Nerd Font: set this to false for symbols every font has.
+nerd_font = true
 
 # Paint the terminal background with the theme color while running. The light
 # silverface theme always paints it, as its dark text needs the light background.

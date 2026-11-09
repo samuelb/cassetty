@@ -64,6 +64,7 @@ type Options struct {
 	Theme           string
 	Volume          int
 	ShowHidden      bool
+	NerdFont        bool // draw the browser icons from a Nerd Font
 	Shuffle         bool
 	Repeat          string
 	Tape            bool // start with the tape sound on

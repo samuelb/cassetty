@@ -535,6 +535,25 @@ func (m *Model) rowStyle(selected bool, i int) lipgloss.Style {
 	return lipgloss.NewStyle()
 }
 
+// browserIcons stand in front of the entries of the browser. Each is one
+// cell wide.
+type browserIcons struct{ parent, folder, track string }
+
+var (
+	// plainIcons are in every font.
+	plainIcons = browserIcons{parent: "◂", folder: "▸", track: "♪"}
+	// nerdIcons come from a Nerd Font: nf-fa-level_up, and the folder and
+	// music icons of eza --icons, nf-custom-folder and nf-fa-music.
+	nerdIcons = browserIcons{parent: "", folder: "", track: ""}
+)
+
+func (m *Model) icons() browserIcons {
+	if m.opts.NerdFont {
+		return nerdIcons
+	}
+	return plainIcons
+}
+
 // nowPlayingGlyph pulses with the music.
 func (m *Model) nowPlayingGlyph() string {
 	if m.state != statePlaying {
@@ -573,6 +592,7 @@ func (m *Model) libraryRows(w, rows int) []string {
 	if m.cur != nil {
 		playing = m.cur.Path
 	}
+	icons := m.icons()
 	out := make([]string, 0, rows)
 	for r := 0; r < rows; r++ {
 		i := m.offset + r
@@ -594,11 +614,11 @@ func (m *Model) libraryRows(w, rows int) []string {
 		iconStyle := base.Foreground(t.Muted)
 		switch {
 		case isParent(e):
-			icon = "◂"
+			icon = icons.parent
 			iconStyle = base.Foreground(t.Accent2)
 			nameStyle = base.Foreground(t.Muted).Bold(true)
 		case e.IsDir:
-			icon = "▸"
+			icon = icons.folder
 			iconStyle = base.Foreground(t.Accent2)
 			nameStyle = nameStyle.Bold(true)
 		case e.Path == playing:
@@ -607,7 +627,7 @@ func (m *Model) libraryRows(w, rows int) []string {
 			nameStyle = base.Foreground(t.Accent).Bold(true)
 			right = strings.ToUpper(e.Ext()) + "  " + humanSize(e.Size)
 		default:
-			icon = "♪"
+			icon = icons.track
 			right = strings.ToUpper(e.Ext()) + "  " + humanSize(e.Size)
 		}
 		lb.add(iconStyle, " "+icon+" ")
