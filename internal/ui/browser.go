@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -95,9 +96,10 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 
 // refilter lists the entries that match the filter: by name in the shown
 // folder, or by path relative to the root while searching the library.
+// Neither case nor accents count, see library.Fold.
 func (m *Model) refilter() {
 	m.visible = m.visible[:0]
-	terms := strings.Fields(strings.ToLower(m.filter))
+	terms := strings.Fields(library.Fold(m.filter))
 	entries := m.shown()
 	if m.search.on && len(terms) == 0 {
 		entries = nil // nothing to search for yet
@@ -111,7 +113,7 @@ outer:
 		if m.search.on {
 			name = m.search.keys[i]
 		} else {
-			name = strings.ToLower(e.Name)
+			name = library.Fold(e.Name)
 		}
 		for _, t := range terms {
 			if !strings.Contains(name, t) {
@@ -659,33 +661,47 @@ func (m *Model) libraryRows(w, rows int) []string {
 
 // highlight writes name, emphasising the filter matches.
 func (m *Model) highlight(lb *lineBuf, name string, st, base lipgloss.Style) {
-	terms := strings.Fields(strings.ToLower(m.filter))
+	terms := strings.Fields(library.Fold(m.filter))
 	if len(terms) == 0 {
 		lb.add(st, name)
 		return
 	}
-	runes := []rune(name)
-	lower := []rune(strings.ToLower(name))
-	mark := make([]bool, len(runes))
-	if len(lower) == len(runes) {
-		for _, term := range terms {
-			tr := []rune(term)
-			for i := 0; i+len(tr) <= len(lower); i++ {
-				if string(lower[i:i+len(tr)]) == term {
-					for j := range tr {
-						mark[i+j] = true
-					}
+	// The filter matches the folded name. of[i] is the letter of the name
+	// that the i-th rune of the folded name comes from.
+	parts := library.Parts(name)
+	var folded []rune
+	var of []int
+	for i, p := range parts {
+		for _, r := range p.Fold {
+			folded, of = append(folded, r), append(of, i)
+		}
+	}
+	mark := make([]bool, len(parts))
+	for _, term := range terms {
+		tr := []rune(term)
+		for i := 0; i+len(tr) <= len(folded); i++ {
+			if slices.Equal(folded[i:i+len(tr)], tr) {
+				for j := range tr {
+					mark[of[i+j]] = true
 				}
 			}
 		}
 	}
 	hl := st.Foreground(m.theme.Accent).Underline(true)
-	for i, r := range runes {
-		if mark[i] {
-			lb.add(hl, string(r))
-		} else {
-			lb.add(st, string(r))
+	for i := 0; i < len(parts); {
+		j := i
+		var run strings.Builder
+		for ; j < len(parts) && mark[j] == mark[i]; j++ {
+			run.WriteString(parts[j].Text)
 		}
+		if mark[i] {
+			// Underlined text is styled letter by letter, which would part
+			// an accent that stands by itself from its letter.
+			lb.add(hl, library.Compose(run.String()))
+		} else {
+			lb.add(st, run.String())
+		}
+		i = j
 	}
 }
 

@@ -20,7 +20,7 @@ type librarySearch struct {
 	on bool // the library list shows the search
 
 	index    []library.Entry // every folder and track of the library
-	keys     []string        // the lowercased path of each, relative to the root
+	keys     []string        // the folded path of each, relative to the root
 	ready    bool            // index has been read
 	scanning bool
 	err      error // of the last read, while none succeeded
@@ -97,7 +97,7 @@ func (m *Model) scanLibrary() tea.Cmd {
 		keys := make([]string, len(entries))
 		for i, e := range entries {
 			rel, _ := filepath.Rel(root, e.Path)
-			keys[i] = strings.ToLower(rel)
+			keys[i] = library.Fold(rel)
 		}
 		return scanMsg{entries: entries, keys: keys, err: err}
 	}

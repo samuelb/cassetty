@@ -136,7 +136,8 @@ the music folder, so `floyd wall` finds the folder *Pink Floyd/The Wall* and
 its tracks. `tab` switches between the two while you type. `enter` on a track
 plays its folder from that track, as in the browser, and `esc` goes back to
 the folder you were in. Each search reads the library afresh, so it finds
-what you added since.
+what you added since. Neither minds upper and lower case, nor accents:
+`bjork` finds *Björk*.
 
 On macOS the media keys work too, as do headphone buttons and the Now
 Playing widget in Control Center, which shows the playing track and can seek

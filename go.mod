@@ -18,6 +18,7 @@ require (
 	github.com/lrstanley/bubblezone/v2 v2.0.0
 	github.com/lucasb-eyer/go-colorful v1.4.1
 	golang.org/x/sys v0.49.0
+	golang.org/x/text v0.44.0
 )
 
 require (
@@ -41,5 +42,5 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v1.2.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
 )

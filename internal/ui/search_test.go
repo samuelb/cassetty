@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/samuelb/cassetty/internal/library"
 )
 
@@ -172,5 +174,56 @@ func TestSearchKeepsTheFolderUpToDate(t *testing.T) {
 	press(m, "esc")
 	if len(m.visible) != len(entries) {
 		t.Fatalf("the folder lists %d entries, want %d", len(m.visible), len(entries))
+	}
+}
+
+func TestFilterAndSearchFindAccentedNames(t *testing.T) {
+	root := t.TempDir()
+	const (
+		aerzte = "Die A\u0308rzte" // decomposed, as programs on macOS store it
+		bjork  = "Bj\u00f6rk"      // composed, as a keyboard types it
+	)
+	for _, p := range []string{aerzte + "/Geschwisterliebe.mp3", bjork + "/J\u00f3ga.mp3", "Zappa/Muffin Man.mp3"} {
+		p = filepath.Join(root, p)
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, []byte("x"), 0o644)
+	}
+	m := newTestModel(t, root)
+	for query, want := range map[string]string{
+		"\u00e4rzte":   aerzte,
+		"a\u0308rzte":  aerzte,
+		"arzte":        aerzte,
+		"\u00c4RZTE":   aerzte,
+		"die \u00e4rz": aerzte,
+		"bj\u00f6rk":   bjork,
+		"bjo\u0308rk":  bjork,
+		"bjork":        bjork,
+		"ZAPPA":        "Zappa",
+		"z\u00e4ppa":   "Zappa",
+	} {
+		press(m, "/")
+		typeText(m, query)
+		if got := results(m); !slices.Equal(got, []string{want + "/"}) {
+			t.Errorf("the filter %+q lists %+q, want %+q", query, got, want+"/")
+		}
+		press(m, "esc")
+	}
+
+	press(m, "F")
+	typeText(m, "joga")
+	if got, want := results(m), []string{bjork + "/J\u00f3ga.mp3"}; !slices.Equal(got, want) {
+		t.Errorf("the search lists %+q, want %+q", got, want)
+	}
+	press(m, "esc")
+
+	// The match is marked in the name, with every accent on its letter.
+	m.filter = "arz"
+	var lb lineBuf
+	m.highlight(&lb, aerzte, fg(m.theme.Text), fg(m.theme.Text))
+	if got := ansi.Strip(lb.String()); got != "Die \u00c4rzte" || lb.w != 9 {
+		t.Errorf("highlighting made the name %+q, %d cells wide", got, lb.w)
+	}
+	if strings.Count(lb.String(), "\x1b[4;") != 3 {
+		t.Errorf("the three letters of the match are not underlined: %+q", lb.String())
 	}
 }
