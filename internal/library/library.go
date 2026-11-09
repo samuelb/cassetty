@@ -6,9 +6,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
+	"sort"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/dhowden/tag"
@@ -46,7 +45,7 @@ func NewFormats(exts []string) Formats {
 func (f Formats) Playable(name string) bool { return f[Ext(name)] }
 
 // ReadDir lists the sub folders and playable files of dir. Folders come
-// first; both groups are sorted in natural order ("2" before "10").
+// first; both groups are sorted in the order of NaturalCompare.
 func ReadDir(dir string, formats Formats, showHidden bool) ([]Entry, error) {
 	des, err := os.ReadDir(dir)
 	if err != nil {
@@ -79,10 +78,38 @@ func ReadDir(dir string, formats Formats, showHidden bool) ([]Entry, error) {
 			files = append(files, Entry{Name: name, Path: p, Size: size})
 		}
 	}
-	byName := func(a, b Entry) int { return NaturalCompare(a.Name, b.Name) }
-	slices.SortFunc(dirs, byName)
-	slices.SortFunc(files, byName)
+	sortByName(dirs)
+	sortByName(files)
 	return append(dirs, files...), nil
+}
+
+// sortByName sorts entries in the order of NaturalCompare.
+func sortByName(entries []Entry) {
+	s := byName{entries: entries, keys: make([]string, len(entries))}
+	for i, e := range entries {
+		s.keys[i] = Fold(e.Name)
+	}
+	sort.Sort(s)
+}
+
+// byName sorts entries by their names, of which keys holds the folded form.
+type byName struct {
+	entries []Entry
+	keys    []string
+}
+
+func (s byName) Len() int { return len(s.entries) }
+
+func (s byName) Less(i, j int) bool {
+	if c := compareFolded(s.keys[i], s.keys[j]); c != 0 {
+		return c < 0
+	}
+	return s.entries[i].Name < s.entries[j].Name
+}
+
+func (s byName) Swap(i, j int) {
+	s.entries[i], s.entries[j] = s.entries[j], s.entries[i]
+	s.keys[i], s.keys[j] = s.keys[j], s.keys[i]
 }
 
 // Collect returns all playable files below dir, in the order of Walk.
@@ -139,10 +166,19 @@ func Walk(dir string, formats Formats, showHidden bool) ([]Entry, error) {
 	return out, err
 }
 
-// NaturalCompare compares strings case-insensitively, treating runs of
-// digits as numbers.
+// NaturalCompare compares strings without regard to case and accents, see
+// Fold, and treats runs of digits as numbers: "2" comes before "10", and
+// an accented letter among the plain ones, not after "z".
 func NaturalCompare(a, b string) int {
-	oa, ob := a, b
+	if c := compareFolded(Fold(a), Fold(b)); c != 0 {
+		return c
+	}
+	return strings.Compare(a, b)
+}
+
+// compareFolded is NaturalCompare for folded strings. It takes names that
+// differ in case, accents or leading zeros only for equal.
+func compareFolded(a, b string) int {
 	for a != "" && b != "" {
 		if isDigit(a[0]) && isDigit(b[0]) {
 			na, nb := digitRun(a), digitRun(b)
@@ -158,15 +194,12 @@ func NaturalCompare(a, b string) int {
 		}
 		ra, sa := utf8.DecodeRuneInString(a)
 		rb, sb := utf8.DecodeRuneInString(b)
-		if la, lb := unicode.ToLower(ra), unicode.ToLower(rb); la != lb {
-			return cmpInt(int(la), int(lb))
+		if ra != rb {
+			return cmpInt(int(ra), int(rb))
 		}
 		a, b = a[sa:], b[sb:]
 	}
-	if c := cmpInt(len(a), len(b)); c != 0 {
-		return c
-	}
-	return strings.Compare(oa, ob)
+	return cmpInt(len(a), len(b))
 }
 
 func isDigit(c byte) bool { return c >= '0' && c <= '9' }
