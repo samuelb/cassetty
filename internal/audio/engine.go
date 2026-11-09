@@ -213,6 +213,16 @@ func (e *Engine) Speed() float64 {
 	return d.tape.motor
 }
 
+// Ended reports whether the loaded track has played to its end, with no
+// queued track to roll on to: the deck stands still until it is told to
+// seek or to start another track.
+func (e *Engine) Ended() bool {
+	d := e.deck
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.stream != nil && d.ended
+}
+
 // Seek moves the play head of the loaded track to t.
 func (e *Engine) Seek(t time.Duration) error {
 	d := e.deck

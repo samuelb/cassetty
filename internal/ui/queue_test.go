@@ -139,3 +139,58 @@ func TestShuffleNamesTheSameNextTrackUntilItPlays(t *testing.T) {
 		}
 	}
 }
+
+// awaitEnd waits for the deck to report the end of a track.
+func awaitEnd(t *testing.T, m *Model) audio.Event {
+	t.Helper()
+	select {
+	case ev := <-m.engine.Events():
+		return ev
+	case <-time.After(3 * time.Second):
+		t.Fatal("the track did not end")
+		return audio.Event{}
+	}
+}
+
+func TestTrackEndsWhileAnotherFailsToOpen(t *testing.T) {
+	root := toneLibrary(t, 3, 400*time.Millisecond)
+	m := newTestModel(t, root)
+	press(m, "enter") // plays the first track, with the second queued
+	if len(m.playlist) != 3 || m.queue.src == nil || m.state != statePlaying {
+		t.Fatalf("%d tracks, state %v, queued %v", len(m.playlist), m.state, m.queue.src != nil)
+	}
+	// The third track is gone from the disk: opening it fails at once.
+	if err := os.Remove(filepath.Join(root, "03.wav")); err != nil {
+		t.Fatal(err)
+	}
+
+	// The third track is picked, and while it is being opened the first
+	// ends and the deck rolls on to the second.
+	open := m.playTrack(m.playlist[2], true)
+	ev := awaitEnd(t, m)
+	if ev.Next == 0 {
+		t.Fatalf("the deck did not roll on: %+v", ev)
+	}
+	_, _ = m.Update(audioEventMsg(ev))
+	if m.cur != m.playlist[0] {
+		t.Fatal("the track being opened should decide what is loaded")
+	}
+	run(m, open) // it cannot be opened
+	if m.cur != m.playlist[1] || m.state != statePlaying || m.gen != ev.Next {
+		t.Fatalf("the model shows %s (state %v), the deck plays 02.wav", filepath.Base(m.cur.Path), m.state)
+	}
+	if !m.flashErr || !m.playlist[2].Failed {
+		t.Errorf("the failed track is not reported: flash %q", m.flash)
+	}
+
+	// The second track ends, the third still cannot be opened, and nothing
+	// is left to play.
+	_, cmd := m.Update(audioEventMsg(awaitEnd(t, m)))
+	run(m, cmd)
+	if m.state != stateStopped || m.cur != m.playlist[1] {
+		t.Fatalf("state %v with nothing left to play, want the deck stopped", m.state)
+	}
+	if !m.flashErr {
+		t.Errorf("flash %q hides why the last track did not play", m.flash)
+	}
+}

@@ -91,23 +91,26 @@ type Model struct {
 	lay           layout
 
 	// playback
-	playlist  []*Track
-	cur       *Track // loaded track (may have been removed from the playlist)
-	curHint   int    // last known playlist index of cur
-	src       *audio.Source
-	meta      library.Meta
-	gen       uint64
-	state     playState
-	pos       time.Duration
-	volume    int
-	muted     bool
-	shuffle   bool
-	order     []int
-	repeat    repeatMode
-	loadSeq   int
-	loading   bool
-	failures  int // tracks in a row that could not be opened
-	broken    int // tracks in a row that broke off while playing
+	playlist []*Track
+	cur      *Track // loaded track (may have been removed from the playlist)
+	curHint  int    // last known playlist index of cur
+	src      *audio.Source
+	meta     library.Meta
+	gen      uint64
+	state    playState
+	pos      time.Duration
+	volume   int
+	muted    bool
+	shuffle  bool
+	order    []int
+	repeat   repeatMode
+	loadSeq  int
+	loading  bool
+	failures int // tracks in a row that could not be opened
+	broken   int // tracks in a row that broke off while playing
+	// the end of the loaded track, when it came while another was being
+	// opened, see followDeck
+	held      *audio.Event
 	remaining bool
 	tape      bool // the tape sound is on
 
@@ -535,8 +538,14 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case audioEventMsg:
 		cmds := []tea.Cmd{m.waitAudio()}
-		if msg.Gen == m.gen && !m.loading {
-			cmds = append(cmds, m.trackOver(audio.Event(msg)))
+		switch ev := audio.Event(msg); {
+		case ev.Gen != m.gen: // of a track that is gone
+		case m.loading:
+			// The track being opened takes over the deck, unless it fails
+			// to open: the deck is followed then, see followDeck.
+			m.held = &ev
+		default:
+			cmds = append(cmds, m.trackOver(ev))
 		}
 		return m, tea.Batch(cmds...)
 
@@ -612,18 +621,21 @@ func (m *Model) applyOpened(msg openedMsg) tea.Cmd {
 	m.resuming = nil
 	if msg.err != nil {
 		msg.track.Failed = true
-		m.setFlash(msg.err.Error(), true)
 		m.failures++
 		if msg.autoplay && m.failures < len(m.playlist) {
 			if i := slices.Index(m.playlist, msg.track); i >= 0 {
 				m.turnOrder(i)
 				if n, ok := m.nextIndexFrom(i); ok {
+					m.setFlash(msg.err.Error(), true)
 					return m.load(m.playlist[n], true)
 				}
 			}
 		}
-		return nil
+		cmd := m.followDeck()
+		m.setFlash(msg.err.Error(), true)
+		return cmd
 	}
+	m.held = nil
 	m.queue = queued{} // Start clears the engine's queue
 	m.install(msg.track, msg.src, msg.meta, m.engine.Start(msg.src, msg.autoplay))
 	if msg.at > 0 {
@@ -638,6 +650,23 @@ func (m *Model) applyOpened(msg openedMsg) tea.Cmd {
 		m.state = stateStopped
 	}
 	return m.kickTick()
+}
+
+// followDeck brings the model back in line with the deck when a track could
+// not be opened and no other is opened in its place. The track that was
+// loaded all along may be over by now: the deck rolled on to the queued
+// track, which then is the loaded one, or it ran out, which stops it like
+// the end of the tape does.
+func (m *Model) followDeck() tea.Cmd {
+	ev := m.held
+	m.held = nil
+	switch {
+	case ev != nil && ev.Gen == m.gen && ev.Next != 0 && ev.Next == m.queue.gen:
+		return m.advance()
+	case m.state == statePlaying && m.engine.Ended():
+		return m.stop()
+	}
+	return nil
 }
 
 // install makes t, opened as src, the loaded track; gen is its generation
@@ -792,7 +821,7 @@ func (m *Model) eject() tea.Cmd {
 		return nil
 	}
 	m.engine.Eject()
-	m.src, m.cur = nil, nil
+	m.src, m.cur, m.held = nil, nil, nil
 	m.queue = queued{} // Eject clears the engine's queue
 	m.state = stateStopped
 	m.pos = 0
