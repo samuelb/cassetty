@@ -98,9 +98,28 @@ func (m *Model) shortHelp() []footerHint {
 	}
 }
 
+// hintLine is the line of footer hints drawn last, and what it was drawn
+// for: it stays the same from frame to frame, and fitting the hints takes
+// rendering them several times over.
+type hintLine struct {
+	tab      tab
+	w, theme int
+	line     string
+	drawn    bool
+}
+
 // shortHelpLine renders the footer hints in at most w cells, leaving out the
 // least important ones that do not fit.
 func (m *Model) shortHelpLine(w int) string {
+	if h := m.hints; h.drawn && h.tab == m.tab && h.w == w && h.theme == m.themeIdx {
+		return h.line
+	}
+	line := m.fitShortHelp(w)
+	m.hints = hintLine{tab: m.tab, w: w, theme: m.themeIdx, line: line, drawn: true}
+	return line
+}
+
+func (m *Model) fitShortHelp(w int) string {
 	hints := m.shortHelp()
 	keys := func() []key.Binding {
 		ks := make([]key.Binding, len(hints))

@@ -83,9 +83,10 @@ func (m *Model) renderLCD(w, h int) []string {
 	inner := w - 4 // frame + one cell padding on each side
 
 	var rows []string
+	edgeL, edgeR := frame.Render("│")+bg.Render(" "), bg.Render(" ")+frame.Render("│")
 	add := func(lb *lineBuf) {
 		lb.padTo(bg, inner)
-		rows = append(rows, frame.Render("│")+bg.Render(" ")+lb.String()+bg.Render(" ")+frame.Render("│"))
+		rows = append(rows, edgeL+lb.String()+edgeR)
 	}
 
 	// Time block with state glyph and stream information.
@@ -340,10 +341,8 @@ func (m *Model) spectrumRows(w, rows int) []string {
 		var lb lineBuf
 		rowStyle := fgbg(colors[r], t.LCDBg)
 		lo := float64(rows-1-r) / float64(rows)
+		last := blank // the style of the cell before
 		for b := 0; b < bars; b++ {
-			if b > 0 && gap > 0 {
-				lb.add(blank, " ")
-			}
 			st := rowStyle
 			if barStyles != nil {
 				st = barStyles[b]
@@ -352,27 +351,36 @@ func (m *Model) spectrumRows(w, rows int) []string {
 			if b < len(m.spectrum.Levels) {
 				lvl, pk = m.spectrum.Levels[b], m.spectrum.Peaks[b]
 			}
+			cell := " "
 			eighths := int(math.Round((lvl - lo) * float64(rows) * 8))
 			switch {
 			case eighths >= 8:
-				lb.add(st, "█")
+				cell = "█"
 			case eighths > 0:
-				lb.add(st, barChars[eighths])
+				cell = barChars[eighths]
 			default:
 				pe := (pk - lo) * float64(rows) * 8
 				switch {
 				case pk > 0.02 && pe >= 0 && pe < 8:
-					ch := "▁"
+					st, cell = peak, "▁"
 					if pe >= 4 {
-						ch = "▔"
+						cell = "▔"
 					}
-					lb.add(peak, ch)
 				case r == rows-1:
-					lb.add(ghost, "▁")
+					st, cell = ghost, "▁"
 				default:
-					lb.add(blank, " ")
+					st = last
 				}
 			}
+			// A blank looks the same in every one of these styles, as they
+			// share the background. So an empty cell goes with the cell
+			// before it and a gap with the bar after it, which makes one run
+			// of the cells that are alike in a row.
+			if b > 0 && gap > 0 {
+				cell = " " + cell
+			}
+			lb.add(st, cell)
+			last = st
 		}
 		lb.padTo(blank, w)
 		out[r] = lb.String()

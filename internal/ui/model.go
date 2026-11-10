@@ -89,6 +89,7 @@ type Model struct {
 	themeIdx int
 	keys     keyMap
 	help     help.Model
+	hints    hintLine
 
 	width, height int
 	lay           layout
