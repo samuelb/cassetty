@@ -138,6 +138,10 @@ type Model struct {
 	// the track to play once its folder is listed, see Options.Play
 	startWith string
 
+	// counts the playlists there have been: a new one takes the place of
+	// the old, whose tracks then need no more reading, see readInfo
+	listID int
+
 	// saving the state while running, see keepState
 	edits   int       // changes to the playlist so far
 	stored  stateMark // of the state as it was saved last
@@ -414,7 +418,19 @@ type queuedMsg struct {
 
 type audioEventMsg audio.Event
 
-type metaMsg map[string]library.Meta
+// trackInfo is what the playlist shows of a track: its tags, and how long
+// it plays.
+type trackInfo struct {
+	meta   library.Meta
+	length time.Duration
+}
+
+// metaMsg brings what was read of some tracks of the playlist.
+type metaMsg struct {
+	info map[string]trackInfo
+	rest []string // the tracks still to read
+	list int      // the playlist they are of, see Model.listID
+}
 
 func (m *Model) Init() tea.Cmd {
 	focus := ""
@@ -575,11 +591,21 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case metaMsg:
 		for _, t := range m.playlist {
-			if md, ok := msg[t.Path]; ok && t.Meta == nil {
-				t.Meta = &md
+			in, ok := msg.info[t.Path]
+			if !ok {
+				continue
+			}
+			if t.Meta == nil {
+				t.Meta = &in.meta
+			}
+			if t.Length == 0 {
+				t.Length = in.length // until the track is loaded, which knows it to the frame
 			}
 		}
-		return m, nil
+		if msg.list != m.listID {
+			return m, nil // the rest is of a playlist that is gone
+		}
+		return m, m.readInfo(msg.rest)
 
 	case audioEventMsg:
 		cmds := []tea.Cmd{m.waitAudio()}
@@ -1128,6 +1154,7 @@ func tracksFor(paths []string) []*Track {
 	return out
 }
 
+// readMeta reads the tags and the lengths of the tracks that have none yet.
 func (m *Model) readMeta(tracks []*Track) tea.Cmd {
 	var paths []string
 	for _, t := range tracks {
@@ -1135,15 +1162,28 @@ func (m *Model) readMeta(tracks []*Track) tea.Cmd {
 			paths = append(paths, t.Path)
 		}
 	}
+	return m.readInfo(paths)
+}
+
+// infoBatch is how long tracks are read for before what was found is shown.
+// A long playlist so fills in from its top while the rest is still read.
+const infoBatch = 100 * time.Millisecond
+
+// readInfo reads the tags and the lengths of the tracks at paths, as many as
+// infoBatch allows; the message that brings them asks for the rest.
+func (m *Model) readInfo(paths []string) tea.Cmd {
 	if len(paths) == 0 {
 		return nil
 	}
+	list := m.listID
 	return func() tea.Msg {
-		out := make(metaMsg, len(paths))
-		for _, p := range paths {
-			out[p] = library.ReadMeta(p)
+		info := make(map[string]trackInfo)
+		began := time.Now()
+		n := 0
+		for ; n < len(paths) && (n == 0 || time.Since(began) < infoBatch); n++ {
+			info[paths[n]] = trackInfo{meta: library.ReadMeta(paths[n]), length: audio.Duration(paths[n])}
 		}
-		return out
+		return metaMsg{info: info, rest: paths[n:], list: list}
 	}
 }
 
@@ -1151,6 +1191,7 @@ func (m *Model) readMeta(tracks []*Track) tea.Cmd {
 func (m *Model) replacePlaylist(tracks []*Track, start int) tea.Cmd {
 	m.playlist = tracks
 	m.edited()
+	m.listID++
 	m.curHint = -1
 	m.plCursor, m.plOffset = start, 0
 	m.failures = 0

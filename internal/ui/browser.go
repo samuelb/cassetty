@@ -355,6 +355,7 @@ func (m *Model) handlePlaylistKey(msg tea.KeyPressMsg) tea.Cmd {
 		if len(m.playlist) > 0 {
 			m.playlist = nil
 			m.edited()
+			m.listID++
 			m.plCursor, m.plOffset = 0, 0
 			m.setFlash("playlist cleared", false)
 		}

@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -192,5 +193,35 @@ func TestTrackEndsWhileAnotherFailsToOpen(t *testing.T) {
 	}
 	if !m.flashErr {
 		t.Errorf("flash %q hides why the last track did not play", m.flash)
+	}
+}
+
+func TestPlaylistShowsTheLengthOfEveryTrack(t *testing.T) {
+	m := newTestModel(t, toneLibrary(t, 4, 2*time.Second))
+	press(m, "enter") // plays the first track; the others are never loaded
+	for i, tr := range m.playlist {
+		if tr.Length != 2*time.Second {
+			t.Errorf("track %d is %v long, want 2s", i+1, tr.Length)
+		}
+		if tr.Meta == nil {
+			t.Errorf("the tags of track %d were not read", i+1)
+		}
+	}
+	if got, want := m.playlistSummary(), "4 tracks · 0:08"; got != want {
+		t.Errorf("the playlist sums up as %q, want %q", got, want)
+	}
+	press(m, "tab")
+	if f := checkFrame(t, m, 100, 30); !strings.Contains(f, "4 tracks · 0:08") || strings.Count(f, "0:02 ") < 4 {
+		t.Errorf("the playlist does not show the lengths:\n%s", f)
+	}
+
+	// What is still to read of a playlist is dropped with the playlist.
+	_, cmd := m.Update(metaMsg{rest: []string{"a.mp3", "b.mp3"}, list: m.listID})
+	if cmd == nil {
+		t.Error("the rest of the playlist is not read")
+	}
+	press(m, "c") // clears the playlist
+	if _, cmd := m.Update(metaMsg{rest: []string{"a.mp3", "b.mp3"}, list: m.listID - 1}); cmd != nil {
+		t.Error("the tracks of a cleared playlist are still read")
 	}
 }
