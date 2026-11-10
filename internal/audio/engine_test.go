@@ -87,11 +87,18 @@ func TestEnginePlaysSeeksAndEnds(t *testing.T) {
 		t.Fatal("no end-of-track event")
 	}
 
-	// Pausing stops the play head.
+	// Pausing stops the play head, once the tape has wound down.
 	if err := e.Seek(0); err != nil {
 		t.Fatal(err)
 	}
 	e.SetPlaying(false)
+	deadline := time.Now().Add(time.Second)
+	for e.Speed() != 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the tape still moves at %v after pausing", e.Speed())
+		}
+		time.Sleep(time.Millisecond)
+	}
 	p0 := e.Position()
 	time.Sleep(100 * time.Millisecond)
 	if p1 := e.Position(); p1 != p0 {
@@ -196,6 +203,15 @@ func newTestEngine() *Engine {
 	return e
 }
 
+// upToSpeed has the tape run at the playing speed at once, rather than get
+// up to it, for the tests that are about something else.
+func (e *Engine) upToSpeed() {
+	e.deck.mu.Lock()
+	e.deck.tape.motor = 1
+	e.deck.publish()
+	e.deck.mu.Unlock()
+}
+
 func nextEvent(t *testing.T, e *Engine) Event {
 	t.Helper()
 	select {
@@ -223,6 +239,7 @@ func TestDeckRollsOnToTheQueuedTrackWithoutAGap(t *testing.T) {
 
 	e := newTestEngine()
 	genA := e.Start(srcA, true)
+	e.upToSpeed()
 	genB := e.Queue(srcB)
 	out := make([][2]float64, SampleRate.N(300*time.Millisecond))
 	e.deck.Stream(out)
@@ -265,6 +282,7 @@ func TestDeckStopsWhenTheQueueIsCleared(t *testing.T) {
 
 	e := newTestEngine()
 	gen := e.Start(srcA, true)
+	e.upToSpeed()
 	e.Queue(srcB)
 	e.Queue(nil)
 	e.deck.Stream(make([][2]float64, SampleRate.N(100*time.Millisecond)))
@@ -306,6 +324,7 @@ func stalledEngine(t *testing.T) (e *Engine, release chan struct{}, pulled chan 
 	src := &Source{stream: st, format: beep.Format{SampleRate: SampleRate, NumChannels: 2, Precision: 2}}
 	e = newTestEngine()
 	e.Start(src, true)
+	e.upToSpeed()
 	pulled = make(chan struct{})
 	go func() {
 		e.deck.Stream(make([][2]float64, 256))

@@ -49,13 +49,21 @@ func (s *Source) Tape() Tape { return TapeFor(s.Codec) }
 // Timing of the tape transport, in seconds.
 const (
 	tapeFade  = 0.15 // the tape sound fades in or out
-	tapeStart = 0.3  // the motor gets up to speed
-	tapeStop  = 0.5  // the tape winds down when it pauses
+	tapeStart = 0.25 // the motor gets up to speed
+	tapeStop  = 0.25 // the tape winds down when it pauses or stops
 	tapeEase  = 0.05 // the sound moves to that of another formulation
 )
 
+// The motor gains and loses speed by these steps per frame, to get up to
+// speed in tapeStart and to wind down in tapeStop.
+const (
+	startStep = 1 / (tapeStart * float64(SampleRate))
+	stopStep  = 1 / (tapeStop * float64(SampleRate))
+)
+
 // tapeSettle is the largest speed correction, in frames per frame, that
-// moves the read position back onto the frames after the tape sound is off.
+// moves the read position back onto the frames after the tape sound is off,
+// or once the motor is up to speed.
 const tapeSettle = 0.0005
 
 // Speed deviations of the transport, as fractions of the nominal speed.
@@ -222,9 +230,9 @@ func (t *transport) process(dst [][2]float64, playing bool, pull func([][2]float
 		}
 		switch {
 		case t.motor < target:
-			t.motor = min(target, t.motor+1/(tapeStart*sr))
+			t.motor = min(target, t.motor+startStep)
 		case t.motor > target:
-			t.motor = max(target, t.motor-1/(tapeStop*sr))
+			t.motor = max(target, t.motor-stopStep)
 		}
 
 		x, ok := t.read(pull)
@@ -252,6 +260,12 @@ func (t *transport) process(dst [][2]float64, playing bool, pull func([][2]float
 		dst[i] = x
 	}
 	return len(dst)
+}
+
+// stopping returns how many frames the motor takes to wind down to a stop
+// from the speed it is at.
+func (t *transport) stopping() int {
+	return int(math.Ceil(t.motor/stopStep)) + 1 // and one for the rounding
 }
 
 // read returns the frame at the read position, interpolated from the frames

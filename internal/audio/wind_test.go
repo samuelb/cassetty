@@ -69,13 +69,22 @@ func (r *reel) Seek(p int) error {
 	return nil
 }
 
-// reelEngine returns an engine without an output with a reel of the length
-// d loaded, and the reel.
-func reelEngine(d time.Duration, play bool) (*Engine, *reel) {
+// reelSource returns a source that plays a reel of the length d, and the
+// reel.
+func reelSource(d time.Duration) (*Source, *reel) {
 	r := &reel{frames: SampleRate.N(d)}
-	src := &Source{stream: r, Length: d, format: beep.Format{SampleRate: SampleRate, NumChannels: 2, Precision: 2}}
+	return &Source{stream: r, Length: d, format: beep.Format{SampleRate: SampleRate, NumChannels: 2, Precision: 2}}, r
+}
+
+// reelEngine returns an engine without an output with a reel of the length
+// d loaded, and the reel. A deck that plays is at speed.
+func reelEngine(d time.Duration, play bool) (*Engine, *reel) {
+	src, r := reelSource(d)
 	e := newTestEngine()
 	e.Start(src, play)
+	if play {
+		e.upToSpeed()
+	}
 	return e, r
 }
 
@@ -275,6 +284,7 @@ func TestWindingAPausedDeckIsSilent(t *testing.T) {
 		t.Errorf("the head is at %v, want 10s", got)
 	}
 	e.SetPlaying(true)
+	e.upToSpeed()
 	if f := e.pull(10 * time.Millisecond)[0]; f != r.frame(SampleRate.N(10*time.Second)) {
 		t.Errorf("the tape plays %v from where it was wound to", f)
 	}

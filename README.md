@@ -135,6 +135,11 @@ folder.
 | `u` | undo the last change | `?` | all keys |
 | | | `q` | quit |
 
+Playing, pausing and stopping sound the way they do on a deck: the tape takes
+a quarter of a second to get up to speed and as long to wind down to a stop,
+so the music speeds up from a standstill and slows down to one. Ejecting a
+playing tape winds it down too.
+
 `←` and `→` wind the tape the way a deck does: it runs fast forward, or back,
 to where it is to go, and while the deck plays you hear the music race by,
 backwards when it rewinds. A key held down winds the tape for as long as it
@@ -171,9 +176,9 @@ Press `T` to hear the music come off a cassette: the tape wows and flutters,
 hisses quietly, saturates a little and loses some treble. How much depends on
 the tape type printed on the label, which follows the file: lossless files
 play from metal tape (type IV), MP3, Ogg and Opus from chrome (type II) and
-everything else from normal tape (type I), which hisses the most. Pausing
-winds the tape down and playing winds it up again. cassetty remembers the
-setting; with it off, the decoded audio plays unchanged.
+everything else from normal tape (type I), which hisses the most. cassetty
+remembers the setting; with it off, the decoded audio plays unchanged once
+the tape is up to speed.
 
 ## Skins
 
