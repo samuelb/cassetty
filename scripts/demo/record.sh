@@ -43,6 +43,7 @@ Set Height 620
 Set Padding 0
 Set Framerate 20
 Set TypingSpeed 0
+Env COLORTERM "truecolor"
 Env XDG_CONFIG_HOME "$work/cfg"
 Env XDG_STATE_HOME "$work/state"
 Hide
