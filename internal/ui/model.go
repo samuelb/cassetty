@@ -462,7 +462,7 @@ func (m *Model) kickTick() tea.Cmd {
 }
 
 func (m *Model) animating() bool {
-	if m.state == statePlaying || m.spin != 0 || m.drag != "" || m.engine.Speed() > 0 {
+	if m.state == statePlaying || m.spin != 0 || m.drag != "" || m.engine.Speed() != 0 || m.engine.Winding() {
 		return true
 	}
 	if m.vu.L > 0.002 || m.vu.R > 0.002 || m.vu.PeakL > 0.002 || m.vu.PeakR > 0.002 {
@@ -512,9 +512,10 @@ func (m *Model) animate(dt float64) {
 		m.pos = m.engine.Position()
 	}
 	playing := m.state == statePlaying
-	// The tape keeps moving for a moment after a pause while it winds down.
+	// The tape keeps moving for a moment after a pause while it winds down,
+	// and it moves fast, or backwards, while it is wound.
 	motor := m.engine.Speed()
-	running := motor > 0
+	running := motor != 0
 
 	if m.src != nil {
 		speed := m.spin + motor
@@ -932,17 +933,42 @@ func (m *Model) seekTo(t time.Duration) {
 	m.pos = t
 }
 
+// windLimit is how far the tape is wound at most. Further than that takes
+// the deck longer than anyone waits for it, so the play head jumps there.
+const windLimit = 2 * time.Minute
+
+// seekBy moves the play head by d the way a deck does: the tape winds fast
+// forward or back, and is heard doing so while it plays.
 func (m *Model) seekBy(d time.Duration) tea.Cmd {
 	if m.src == nil {
 		return nil
 	}
-	m.seekTo(m.engine.Position() + d)
-	if d > 0 {
-		m.spin = 6
-	} else {
-		m.spin = -6
+	if d > windLimit || d < -windLimit {
+		m.seekTo(m.engine.Position() + d)
+		if d > 0 {
+			m.spin = 6
+		} else {
+			m.spin = -6
+		}
+		return m.kickTick()
+	}
+	if err := m.engine.Wind(d); err != nil {
+		m.setFlash("seek: "+err.Error(), true)
 	}
 	return m.kickTick()
+}
+
+// winding tells which way the tape is wound: 1 fast forward, -1 back, and 0
+// when it plays or stands still.
+func (m *Model) winding() int {
+	switch s := m.engine.Speed(); {
+	case !m.engine.Winding():
+	case s > 1:
+		return 1
+	case s < 0:
+		return -1
+	}
+	return 0
 }
 
 // trackOver follows the deck once the loaded track is over: it played to its

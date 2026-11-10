@@ -116,9 +116,15 @@ var tapeSounds = [...]tapeSound{
 // a cassette while the tape sound is on. With the tape sound off and the
 // motor at full speed the frames pass through unchanged.
 type transport struct {
-	on    bool    // the tape sound is wanted
-	mix   float64 // how much of the tape sound is heard; follows on
-	motor float64 // tape speed, from 0 (standing still) to 1 (full speed)
+	on  bool    // the tape sound is wanted
+	mix float64 // how much of the tape sound is heard; follows on
+	// motor is the tape speed, from 0 (standing still) to 1 (full speed).
+	// While the tape winds it is the speed of that: many times the full
+	// speed, and negative in reverse.
+	motor float64
+	// wind runs the tape while it winds fast forward or back, in place of
+	// the varispeed reader; nil otherwise.
+	wind *winder
 
 	// The varispeed reader: frames read from the deck and the read
 	// position in them. buf[0] is the frame before the first unread one,
@@ -153,6 +159,20 @@ func (t *transport) reset() {
 	t.n, t.pos, t.dry = 1, 1, false
 }
 
+// unread returns the frames read from the deck that the head has not got to
+// yet.
+func (t *transport) unread() [][2]float64 {
+	n := t.n
+	if t.dry {
+		n -= 2 // the silence after the last frame
+	}
+	i := int(math.Ceil(t.pos))
+	if i >= n {
+		return nil
+	}
+	return t.buf[i:n]
+}
+
 // load sets the formulation of the track that plays.
 func (t *transport) load(tape Tape) {
 	t.want = tapeSounds[tape]
@@ -169,26 +189,42 @@ func (t *transport) setOn(on bool) {
 
 // process fills dst with frames read from the deck through pull, and
 // returns how many it filled: fewer than len(dst) means the deck has run
-// out. While playing is false the motor winds down; the caller stops calling
-// once the motor has come to a stop.
+// out, or that the tape has wound to where it was to go (see winder), which
+// the caller is to end. While playing is false the motor winds down; the
+// caller stops calling once the motor has come to a stop.
 func (t *transport) process(dst [][2]float64, playing bool, pull func([][2]float64) int) int {
 	const sr = float64(SampleRate)
 	target := 0.0
 	if playing {
 		target = 1
 	}
+	if t.wind != nil {
+		t.wind.prepare()
+	}
 	for i := range dst {
-		switch {
-		case t.motor < target:
-			t.motor = min(target, t.motor+1/(tapeStart*sr))
-		case t.motor > target:
-			t.motor = max(target, t.motor-1/(tapeStop*sr))
-		}
 		switch {
 		case t.on && t.mix < 1:
 			t.mix = min(1, t.mix+1/(tapeFade*sr))
 		case !t.on && t.mix > 0:
 			t.mix = max(0, t.mix-1/(tapeFade*sr))
+		}
+		if w := t.wind; w != nil {
+			if w.done {
+				return i
+			}
+			x := w.next(playing)
+			t.motor = w.speed
+			if t.mix > 0 {
+				x = t.color(x, w.level())
+			}
+			dst[i] = x
+			continue
+		}
+		switch {
+		case t.motor < target:
+			t.motor = min(target, t.motor+1/(tapeStart*sr))
+		case t.motor > target:
+			t.motor = max(target, t.motor-1/(tapeStop*sr))
 		}
 
 		x, ok := t.read(pull)
@@ -203,7 +239,7 @@ func (t *transport) process(dst [][2]float64, playing bool, pull func([][2]float
 		}
 		if t.mix > 0 {
 			speed *= 1 + t.mix*t.wow()
-			x = t.color(x)
+			x = t.color(x, t.motor)
 		}
 		t.pos += speed
 		if t.mix == 0 && t.motor == 1 {
@@ -286,8 +322,9 @@ func (t *transport) wow() float64 {
 }
 
 // color gives the frame the sound of the tape: the head bump in the bass,
-// saturation, hiss and the treble roll-off, mixed in by t.mix.
-func (t *transport) color(x [2]float64) [2]float64 {
+// saturation, hiss and the treble roll-off, mixed in by t.mix. The hiss is
+// as loud as the head puts out the tape, which is level.
+func (t *transport) color(x [2]float64, level float64) [2]float64 {
 	s, w := &t.sound, &t.want
 	s.hiss += (w.hiss - s.hiss) * easeCoef
 	s.treble += (w.treble - s.treble) * easeCoef
@@ -298,7 +335,7 @@ func (t *transport) color(x [2]float64) [2]float64 {
 		y = math.Tanh(s.drive*y) / s.drive
 		nz := t.noise()
 		t.hissLow[c] += hissCoef * (nz - t.hissLow[c])
-		y += (nz - t.hissLow[c]) * s.hiss * t.motor
+		y += (nz - t.hissLow[c]) * s.hiss * level
 		t.treble[c] += s.treble * (y - t.treble[c])
 		x[c] = v + t.mix*(t.treble[c]-v)
 	}

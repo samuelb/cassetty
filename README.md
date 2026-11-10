@@ -119,8 +119,8 @@ folder.
 | `space` `p` | play / pause | `↑↓` `jk` | move (`pgup` `pgdn` `g` `G`) |
 | `s` `v` | stop | `enter` `l` | open folder · play track |
 | `<` `>` | previous · next (`z` `b` `n`) | `backspace` `h` `~` | parent folder · root |
-| `←` `→` | seek 5 s | `a` | add to playlist |
-| `shift+←` `shift+→` | seek 30 s (`[` `]`) | `A` | play, replacing playlist |
+| `←` `→` | rewind · fast forward 5 s | `a` | add to playlist |
+| `shift+←` `shift+→` | the same by 30 s (`[` `]`) | `A` | play, replacing playlist |
 | `+` `-` | volume | `/` | filter, `esc` clears |
 | `m` | mute | `F` | search the whole library |
 | `e` | eject | `f` | find the playing track |
@@ -134,6 +134,12 @@ folder.
 | `K` `J` | move up / down | `t` | next theme |
 | `u` | undo the last change | `?` | all keys |
 | | | `q` | quit |
+
+`←` and `→` wind the tape the way a deck does: it runs fast forward, or back,
+to where it is to go, and while the deck plays you hear the music race by,
+backwards when it rewinds. A key held down winds the tape for as long as it
+is held. The REW and FF keys of the deck and the mouse wheel over the seek
+bar do the same; a click on the seek bar puts the play head there at once.
 
 `u` takes back the last change to the playlist, whichever it was: a track
 added, removed or moved, the playlist cleared, or replaced by playing

@@ -40,7 +40,7 @@ type Config struct {
 	// terminal is not focused. Without it the display slows down to four
 	// frames a second then, which takes far less of the processor.
 	AnimateUnfocused bool `toml:"animate_unfocused"`
-	// SeekStep is the seek distance in seconds for the arrow keys.
+	// SeekStep is how far the arrow keys wind the tape, in seconds.
 	SeekStep int `toml:"seek_step"`
 }
 
@@ -167,7 +167,7 @@ paint_background = true
 # does not tell programs of the focus.
 animate_unfocused = false
 
-# Seek distance in seconds for the left/right arrow keys (shift = 6x).
+# How far the left/right arrow keys wind the tape, in seconds (shift = 6x).
 seek_step = 5
 `
 

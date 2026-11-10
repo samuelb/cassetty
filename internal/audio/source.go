@@ -50,7 +50,42 @@ type Source struct {
 
 	stream beep.StreamSeekCloser
 	format beep.Format // format of stream (may differ from native for ffmpeg)
+	// ahead holds frames read from stream that have not played yet: they
+	// are the next ones of the source, see reader.
+	ahead [][2]float64
 }
+
+// position returns the frame of the source that is read next.
+func (s *Source) position() int {
+	return s.stream.Position() - len(s.ahead)
+}
+
+// putBack returns frames that were read from the source to it, to be read
+// again: the last of frames, as far as the source has been read.
+func (s *Source) putBack(frames [][2]float64) {
+	frames = frames[len(frames)-max(0, min(len(frames), s.position())):]
+	if len(frames) > 0 {
+		s.ahead = append(slices.Clone(frames), s.ahead...)
+	}
+}
+
+// reader streams a source: the frames it has read ahead, then its stream.
+type reader struct{ src *Source }
+
+func (r reader) Stream(samples [][2]float64) (int, bool) {
+	s := r.src
+	n := copy(samples, s.ahead)
+	if s.ahead = s.ahead[n:]; len(s.ahead) == 0 {
+		s.ahead = nil
+	}
+	if n == len(samples) {
+		return n, true
+	}
+	k, ok := s.stream.Stream(samples[n:])
+	return n + k, ok || n > 0
+}
+
+func (r reader) Err() error { return r.src.stream.Err() }
 
 // Close releases the underlying decoder and file.
 func (s *Source) Close() error {
