@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"sync"
@@ -21,7 +22,18 @@ import (
 	"github.com/samuelb/cassetty/internal/ui"
 )
 
+// version is set by the release build, see scripts/release-build.sh.
 var version = "dev"
+
+// buildVersion returns the version to tell: the one the release build set,
+// or else the one Go recorded for the module, which is how a cassetty built
+// by go install knows what it is.
+func buildVersion(set string, info *debug.BuildInfo) string {
+	if set == "dev" && info != nil && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return set
+}
 
 func main() {
 	var err error
@@ -55,7 +67,8 @@ flags:
 	flag.Parse()
 
 	if *showVer {
-		fmt.Println("cassetty", version)
+		info, _ := debug.ReadBuildInfo()
+		fmt.Println("cassetty", buildVersion(version, info))
 		return nil
 	}
 	if *initConfig {
