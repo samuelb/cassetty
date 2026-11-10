@@ -211,3 +211,51 @@ func dirNames(t *testing.T, dir string) []string {
 	}
 	return names
 }
+
+func TestLoadRefusesUnknownKeys(t *testing.T) {
+	load := func(text string) error {
+		path := filepath.Join(t.TempDir(), "config.toml")
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Load(path)
+		return err
+	}
+	if err := load("volume = 30\nseek_step = 10\n"); err != nil {
+		t.Fatalf("a config of known keys: %v", err)
+	}
+	for text, want := range map[string]string{
+		"paint_backgroud = false\n": `unknown key "paint_backgroud": did you mean paint_background?`,
+		"musicdir = \"~/Music\"\n":  `unknown key "musicdir": did you mean music_dir?`,
+		"volume = 30\ncolour = 1\n": `unknown key "colour" (the keys are music_dir, theme, volume,`,
+		"[player]\nvolume = 30\n":   `unknown key "player" (the keys are`,
+		"equalizer = [1, 2, 3]\n":   `unknown key "equalizer" (the keys are`,
+	} {
+		err := load(text)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: got the error %v, want one with %q", text, err, want)
+		}
+	}
+}
+
+func TestKeysAreThoseOfTheSample(t *testing.T) {
+	for _, key := range Keys() {
+		if key == "" {
+			t.Fatal("a setting without a key")
+		}
+		if !strings.Contains(Sample, "\n"+key+" = ") && !strings.Contains(Sample, "\n# "+key+" = ") {
+			t.Errorf("the sample config lacks %s", key)
+		}
+	}
+}
+
+func TestEditDistance(t *testing.T) {
+	for _, c := range []struct {
+		a, b string
+		want int
+	}{{"", "", 0}, {"abc", "abc", 0}, {"abc", "", 3}, {"", "ab", 2}, {"volume", "Volume", 1}, {"kitten", "sitting", 3}, {"musicdir", "music_dir", 1}} {
+		if got := editDistance(c.a, c.b); got != c.want {
+			t.Errorf("editDistance(%q, %q) = %d, want %d", c.a, c.b, got, c.want)
+		}
+	}
+}

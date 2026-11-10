@@ -5,8 +5,10 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -60,11 +62,16 @@ func Path() string {
 }
 
 // Load reads the config file at path on top of the defaults. A missing file
-// is not an error.
+// is not an error; a key that is none of the config's is one, as a
+// misspelled setting would otherwise silently not apply.
 func Load(path string) (Config, error) {
 	cfg := Default()
-	if _, err := toml.DecodeFile(path, &cfg); err != nil && !errors.Is(err, os.ErrNotExist) {
+	md, err := toml.DecodeFile(path, &cfg)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return cfg, err
+	}
+	if unknown := md.Undecoded(); len(unknown) > 0 {
+		return cfg, unknownKey(unknown[0].String())
 	}
 	cfg.MusicDir = ExpandHome(cfg.MusicDir)
 	if cfg.SeekStep <= 0 {
@@ -72,6 +79,53 @@ func Load(path string) (Config, error) {
 	}
 	cfg.Volume = max(0, min(100, cfg.Volume))
 	return cfg, nil
+}
+
+// Keys returns the keys of the config file, in the order of the sample.
+func Keys() []string {
+	t := reflect.TypeFor[Config]()
+	keys := make([]string, t.NumField())
+	for i := range keys {
+		keys[i] = t.Field(i).Tag.Get("toml")
+	}
+	return keys
+}
+
+// unknownKey is the error for a key the config does not have. It names the
+// key that was most likely meant, or else all of them.
+func unknownKey(key string) error {
+	keys := Keys()
+	best, dist := "", len(key)
+	for _, k := range keys {
+		if d := editDistance(key, k); d < dist {
+			best, dist = k, d
+		}
+	}
+	if dist <= max(2, len(key)/4) {
+		return fmt.Errorf("unknown key %q: did you mean %s?", key, best)
+	}
+	return fmt.Errorf("unknown key %q (the keys are %s)", key, strings.Join(keys, ", "))
+}
+
+// editDistance counts the letters to add, drop or change to turn a into b.
+func editDistance(a, b string) int {
+	row := make([]int, len(b)+1)
+	for j := range row {
+		row[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		diag := row[0]
+		row[0] = i
+		for j := 1; j <= len(b); j++ {
+			above := row[j]
+			if a[i-1] != b[j-1] {
+				diag++
+			}
+			row[j] = min(diag, above+1, row[j-1]+1)
+			diag = above
+		}
+	}
+	return row[len(b)]
 }
 
 // Sample is a commented default config file.
