@@ -901,7 +901,7 @@ func (m *Model) stop() tea.Cmd {
 		return nil
 	}
 	cmd := m.setState(stateStopped)
-	m.seekTo(0) // after stopping, so the tape does not wind down from the start
+	m.seekTo(0) // after stopping, so the tape winds down where it was, not at the start
 	return cmd
 }
 

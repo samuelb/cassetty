@@ -178,7 +178,6 @@ func TestEngineWindsTapeDownBeforeSuspending(t *testing.T) {
 	defer close(done)
 	go e.deck.suspendWhenIdle(out, 20*time.Millisecond, done)
 
-	e.SetTape(true)
 	e.Start(src, true)
 	time.Sleep(500 * time.Millisecond)
 	if s := e.Speed(); s != 1 {
@@ -186,7 +185,7 @@ func TestEngineWindsTapeDownBeforeSuspending(t *testing.T) {
 	}
 	e.SetPlaying(false)
 	p0 := e.Position()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(time.Duration(tapeStop * float64(time.Second) / 2))
 	if s := e.Speed(); s <= 0 || s >= 1 {
 		t.Fatalf("speed %v while winding down", s)
 	}
