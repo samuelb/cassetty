@@ -59,8 +59,11 @@ type Track struct {
 
 // Options configure the UI.
 type Options struct {
-	Root            string
-	StartDir        string
+	Root     string
+	StartDir string
+	// Play is a track to play right away, with the tracks of its folder as
+	// the playlist, instead of picking up where the last run left off.
+	Play            string
 	Theme           string
 	Volume          int
 	ShowHidden      bool
@@ -132,6 +135,8 @@ type Model struct {
 	// position in it
 	resuming *Track
 	resumeAt time.Duration
+	// the track to play once its folder is listed, see Options.Play
+	startWith string
 
 	// saving the state while running, see keepState
 	edits   int       // changes to the playlist so far
@@ -224,6 +229,10 @@ func New(opts Options) *Model {
 	}
 	m.restore(opts.Resume)
 	m.stored = m.mark() // as the caller has it stored
+	if p := filepath.Clean(opts.Play); opts.Play != "" && within(m.root, p) {
+		m.startWith, m.dir = p, filepath.Dir(p)
+		m.resuming = nil // that track plays instead
+	}
 	m.engine.SetVolume(float64(m.volume) / 100)
 	m.engine.SetTape(m.tape)
 	if opts.Notice != "" {
@@ -408,8 +417,12 @@ type audioEventMsg audio.Event
 type metaMsg map[string]library.Meta
 
 func (m *Model) Init() tea.Cmd {
+	focus := ""
+	if m.startWith != "" {
+		focus = filepath.Base(m.startWith)
+	}
 	return tea.Batch(
-		m.loadDir(m.dir, ""),
+		m.loadDir(m.dir, focus),
 		m.waitAudio(),
 		m.waitWatch(),
 		m.waitRemote(),
@@ -1329,10 +1342,7 @@ func (m *Model) tapeLength() string {
 }
 
 // within reports whether path is root or below it.
-func within(root, path string) bool {
-	rel, err := filepath.Rel(root, path)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
+func within(root, path string) bool { return library.Within(root, path) }
 
 func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	k := m.keys

@@ -69,6 +69,7 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 			m.dirErr = msg.err
 		}
 		m.setFlash(msg.err.Error(), true)
+		m.startWith = ""
 		return nil
 	}
 	m.endSearch("") // going to a folder ends the search
@@ -91,7 +92,27 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 		}
 	}
 	m.ensureVisible()
-	return m.watchDir()
+	cmd := m.watchDir()
+	if p := m.startWith; p != "" {
+		m.startWith = ""
+		cmd = tea.Batch(cmd, m.playAtStart(p))
+	}
+	return cmd
+}
+
+// playAtStart plays the track at path, which the command line named, now
+// that its folder is listed: as enter on it does, with the folder's tracks
+// as the playlist. A track the listing leaves out, as it does hidden files,
+// plays by itself.
+func (m *Model) playAtStart(path string) tea.Cmd {
+	for i, idx := range m.visible {
+		if e := m.entries[idx]; e.Path == path && !e.IsDir {
+			m.cursor = i
+			m.ensureVisible()
+			return m.playFromDir(e)
+		}
+	}
+	return m.replacePlaylist([]*Track{{Path: path}}, 0)
 }
 
 // refilter lists the entries that match the filter: by name in the shown

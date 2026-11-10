@@ -7,7 +7,11 @@ import (
 	"testing"
 	"time"
 
+	zone "github.com/lrstanley/bubblezone/v2"
+
+	"github.com/samuelb/cassetty/internal/audio"
 	"github.com/samuelb/cassetty/internal/config"
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 // tonePaths returns the paths of the n tracks of a toneLibrary.
@@ -134,5 +138,51 @@ func TestPicksUpTheShuffledOrder(t *testing.T) {
 	})
 	if m.order != nil {
 		t.Fatalf("kept the order %v", m.order)
+	}
+}
+
+// startModel returns a model started the way cassetty starts it.
+func startModel(t *testing.T, root string, options ...func(*Options)) *Model {
+	t.Helper()
+	zone.NewGlobal()
+	e, _ := audio.NewEngine(true)
+	t.Cleanup(e.Close)
+	opts := Options{
+		Root: root, Theme: "classic", Volume: 70, SeekStep: 5 * time.Second,
+		Formats: library.NewFormats(audio.SupportedFormats()), Engine: e,
+	}
+	for _, o := range options {
+		o(&opts)
+	}
+	m := New(opts)
+	t.Cleanup(m.Close)
+	run(m, m.Init())
+	return m
+}
+
+func TestPlaysTheTrackNamedOnTheCommandLine(t *testing.T) {
+	root := tonesNamed(t, "Artist/Album/01.wav", "Artist/Album/02.wav", "Artist/Album/03.wav", "Other/x.wav")
+	track := filepath.Join(root, "Artist", "Album", "02.wav")
+	other := filepath.Join(root, "Other", "x.wav")
+	// What the last run left off at gives way to the track.
+	m := startModel(t, root, resumeFrom(config.Playback{Playlist: []string{other}, Track: other, Position: 1}),
+		func(o *Options) { o.Play = track })
+	if m.dir != filepath.Dir(track) {
+		t.Fatalf("the browser is in %s", m.dir)
+	}
+	if e, ok := m.selectedEntry(); !ok || e.Path != track {
+		t.Errorf("the cursor is on %+v", e)
+	}
+	if len(m.playlist) != 3 || m.cur == nil || m.cur.Path != track || m.currentIndex() != 1 || m.state != statePlaying {
+		t.Fatalf("%d tracks, state %v, loaded %v: want the album playing from its second track (%s)", len(m.playlist), m.state, m.cur, m.flash)
+	}
+}
+
+func TestPlaysAHiddenTrackNamedOnTheCommandLineByItself(t *testing.T) {
+	root := tonesNamed(t, "Album/01.wav", "Album/.hidden.wav")
+	track := filepath.Join(root, "Album", ".hidden.wav")
+	m := startModel(t, root, func(o *Options) { o.Play = track })
+	if len(m.playlist) != 1 || m.cur == nil || m.cur.Path != track || m.state != statePlaying {
+		t.Fatalf("%d tracks, state %v: want the hidden track playing by itself (%s)", len(m.playlist), m.state, m.flash)
 	}
 }

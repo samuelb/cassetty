@@ -29,6 +29,13 @@ func Ext(name string) string {
 	return strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
 }
 
+// Within reports whether path is the folder root or lies below it. It goes
+// by the paths as they are written.
+func Within(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
 // Formats is the set of playable extensions (lowercase, without dot).
 type Formats map[string]bool
 

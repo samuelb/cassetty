@@ -57,7 +57,7 @@ func run() error {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, `cassetty — a cassette deck music player for the terminal
 
-usage: cassetty [flags] [music folder]
+usage: cassetty [flags] [music folder | track]
 
 flags:
 `)
@@ -87,16 +87,8 @@ flags:
 		return fmt.Errorf("config %s: %w", *cfgPath, err)
 	}
 
-	root := cfg.MusicDir
-	switch {
-	case *dirFlag != "":
-		root = *dirFlag
-	case flag.NArg() > 0:
-		root = flag.Arg(0)
-	case root == "":
-		root = config.DefaultMusicDir()
-	}
-	root, err = filepath.Abs(config.ExpandHome(root))
+	formats := library.NewFormats(audio.SupportedFormats())
+	root, play, err := musicFolder(cfg.MusicDir, *dirFlag, flag.Arg(0), formats)
 	if err != nil {
 		return err
 	}
@@ -144,6 +136,7 @@ flags:
 	m, err := ui.Run(ui.Options{
 		Root:            root,
 		StartDir:        state.LastDir,
+		Play:            play,
 		Theme:           theme,
 		Volume:          volume,
 		ShowHidden:      cfg.ShowHidden,
@@ -153,7 +146,7 @@ flags:
 		Tape:            state.Tape,
 		PaintBackground: cfg.PaintBackground,
 		SeekStep:        time.Duration(cfg.SeekStep) * time.Second,
-		Formats:         library.NewFormats(audio.SupportedFormats()),
+		Formats:         formats,
 		Engine:          engine,
 		NowPlaying:      remote,
 		Notice:          notice,
@@ -195,6 +188,38 @@ func (k *keeper) finish(s config.State) {
 	defer k.mu.Unlock()
 	k.done = true
 	_ = config.SaveState(k.root, s)
+}
+
+// musicFolder returns the music folder to run on, and the track to play
+// right away if the command line named one. The folder is the one of the
+// -dir flag, else the argument, else the configured one, else the default.
+// An argument that is a file is a track to play instead: in that music
+// folder if it lies in there, and otherwise with its own folder as the
+// music folder.
+func musicFolder(configured, dirFlag, arg string, formats library.Formats) (root, play string, err error) {
+	if arg != "" {
+		path, err := filepath.Abs(config.ExpandHome(arg))
+		if err != nil {
+			return "", "", err
+		}
+		if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
+			if !formats.Playable(path) {
+				return "", "", fmt.Errorf("cannot play %s: cassetty plays %s", arg, strings.Join(audio.SupportedFormats(), " "))
+			}
+			play, arg = path, ""
+		}
+	}
+	root = cmp.Or(dirFlag, arg, configured)
+	if root == "" {
+		root = config.DefaultMusicDir()
+	}
+	if root, err = filepath.Abs(config.ExpandHome(root)); err != nil {
+		return "", "", err
+	}
+	if play != "" && !library.Within(root, play) {
+		root = filepath.Dir(play)
+	}
+	return root, play, nil
 }
 
 // checkTheme accepts a known theme name, or "" for none.

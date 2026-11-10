@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/samuelb/cassetty/internal/library"
 )
 
 // Config is the user editable configuration file.
@@ -281,10 +283,7 @@ func (s Session) empty(root string) bool {
 // within reports whether anything of the session lies in the library at
 // root, which makes it a session of that library.
 func (s Session) within(root string) bool {
-	in := func(path string) bool {
-		rel, err := filepath.Rel(root, path)
-		return path != "" && err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-	}
+	in := func(path string) bool { return path != "" && library.Within(root, path) }
 	return in(s.LastDir) || in(s.Playback.Track) || slices.ContainsFunc(s.Playback.Playlist, in)
 }
 

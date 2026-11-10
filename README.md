@@ -92,7 +92,7 @@ the tracks.
 ## Usage
 
 ```
-cassetty [flags] [music folder]
+cassetty [flags] [music folder | track]
 
   -dir string       music folder (overrides music_dir from the config)
   -theme string     sunbleached (default), classic, amber, vfd, synthwave, silverface, cyberdeck
@@ -106,6 +106,11 @@ The folder argument wins over the config file; without either cassetty opens
 `~/Music`, or the current folder if there is no `~/Music`. The browser never
 leaves that root folder. Every folder below it lists `..` first, which goes
 up a folder like `backspace` does.
+
+Given a track instead of a folder, as in `cassetty ~/Music/Album/03.flac`,
+cassetty plays it right away, with the tracks of its folder as the playlist.
+A track outside your music folder plays with its own folder as the music
+folder.
 
 ## Keys
 
