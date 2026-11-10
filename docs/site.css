@@ -1,5 +1,35 @@
 /* cassetty site. The skin colors below are generated from internal/ui/theme.go. */
 
+/* The fonts come from this site, not from a font service, which would learn
+   of every visitor. JetBrains Mono and VT323 are under the SIL Open Font
+   License, see fonts/OFL-*.txt. The files are the Latin part of each, which
+   is all the page is written in; JetBrains Mono is one file for every
+   weight. */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url(fonts/jetbrains-mono-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/jetbrains-mono-latin-italic.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: VT323;
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/vt323-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root, [data-theme="sunbleached"] {
   color-scheme: dark;
   --bg: #1d1b21; --border: #3b3640; --focus: #e8a87c; --text: #f0e7dc;
