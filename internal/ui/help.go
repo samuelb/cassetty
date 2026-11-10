@@ -45,6 +45,7 @@ func (m *Model) helpSections() []helpSection {
 			{"d x", "remove track"},
 			{"c", "clear all"},
 			{"K J", "move track up · down"},
+			{"u", "undo the last change"},
 		}},
 		{"MODES", [][2]string{
 			{"S", "shuffle"},

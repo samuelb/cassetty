@@ -353,11 +353,12 @@ func (m *Model) handlePlaylistKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.removeFromPlaylist(m.plCursor)
 	case key.Matches(msg, k.Clear):
 		if len(m.playlist) > 0 {
+			m.remember("playlist cleared")
 			m.playlist = nil
 			m.edited()
 			m.listID++
 			m.plCursor, m.plOffset = 0, 0
-			m.setFlash("playlist cleared", false)
+			m.setFlash("playlist cleared · u brings it back", false)
 		}
 	case key.Matches(msg, k.MoveUp):
 		m.movePlaylist(m.plCursor, -1)

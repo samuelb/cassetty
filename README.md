@@ -132,8 +132,13 @@ folder.
 | `d` `x` | remove | `i` | elapsed · remaining |
 | `c` | clear all | `T` | tape sound |
 | `K` `J` | move up / down | `t` | next theme |
-| | | `?` | all keys |
+| `u` | undo the last change | `?` | all keys |
 | | | `q` | quit |
+
+`u` takes back the last change to the playlist, whichever it was: a track
+added, removed or moved, the playlist cleared, or replaced by playing
+something else. It works from the library as well, and `u` once more does
+the change again. The track in the deck plays on through all of it.
 
 `/` filters the folder you are in. `F` searches the whole library instead: it
 matches the words you type against the paths of the folders and files below

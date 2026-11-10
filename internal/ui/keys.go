@@ -17,7 +17,7 @@ type keyMap struct {
 	Up, Down, PageUp, PageDown, Top, Bottom key.Binding
 	Open, Back, Root, Enqueue, PlayAll      key.Binding
 	Filter, Search, Locate, Tab             key.Binding
-	Remove, Clear, MoveUp, MoveDown         key.Binding
+	Remove, Clear, MoveUp, MoveDown, Undo   key.Binding
 
 	Help, Quit key.Binding
 }
@@ -69,6 +69,7 @@ func newKeyMap() keyMap {
 		Clear:    b([]string{"c"}, "c", "clear playlist"),
 		MoveUp:   b([]string{"K", "shift+up"}, "K", "move up"),
 		MoveDown: b([]string{"J", "shift+down"}, "J", "move down"),
+		Undo:     b([]string{"u"}, "u", "undo playlist change"),
 
 		Help: b([]string{"?"}, "?", "help"),
 		Quit: b([]string{"q", "ctrl+c"}, "q", "quit"),

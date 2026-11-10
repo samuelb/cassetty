@@ -141,6 +141,8 @@ type Model struct {
 	// counts the playlists there have been: a new one takes the place of
 	// the old, whose tracks then need no more reading, see readInfo
 	listID int
+	// the playlist as it was before its last change, see undo
+	before *listState
 
 	// saving the state while running, see keepState
 	edits   int       // changes to the playlist so far
@@ -1028,6 +1030,44 @@ func (m *Model) edited() {
 	m.edits++
 }
 
+// listState is the playlist at one moment, with the place of the cursor.
+type listState struct {
+	tracks         []*Track
+	cursor, offset int
+	change         string // what was done to it then, as the footer tells it
+	undone         bool   // it is the playlist after a change that was undone
+}
+
+// remember keeps the playlist as it is, for undo to bring back. Whatever
+// changes the playlist calls it first, and says what it is about to do.
+func (m *Model) remember(change string) {
+	m.before = &listState{tracks: slices.Clone(m.playlist), cursor: m.plCursor, offset: m.plOffset, change: change}
+}
+
+// undo brings back the playlist as it was before its last change: a
+// playlist that took an evening to put together is a key away from being
+// cleared or replaced. Undoing once more does the change again. The loaded
+// track stays in the deck either way.
+func (m *Model) undo() tea.Cmd {
+	b := m.before
+	if b == nil {
+		m.setFlash("nothing to undo in the playlist", false)
+		return nil
+	}
+	m.before = &listState{tracks: m.playlist, cursor: m.plCursor, offset: m.plOffset, change: b.change, undone: !b.undone}
+	m.playlist, m.plCursor, m.plOffset = b.tracks, b.cursor, b.offset
+	m.edited()
+	m.listID++
+	m.curHint = -1
+	m.ensurePlaylistVisible()
+	if b.undone {
+		m.setFlash("redone: "+b.change, false)
+	} else {
+		m.setFlash("undone: "+b.change, false)
+	}
+	return m.readMeta(m.playlist)
+}
+
 func (m *Model) reshuffle() {
 	m.nextOrder = nil
 	m.order = rand.Perm(len(m.playlist))
@@ -1189,6 +1229,7 @@ func (m *Model) readInfo(paths []string) tea.Cmd {
 
 // replacePlaylist swaps in a new playlist and starts playing track start.
 func (m *Model) replacePlaylist(tracks []*Track, start int) tea.Cmd {
+	m.remember("playlist replaced")
 	m.playlist = tracks
 	m.edited()
 	m.listID++
@@ -1202,6 +1243,7 @@ func (m *Model) appendTracks(tracks []*Track) tea.Cmd {
 	if len(tracks) == 0 {
 		return nil
 	}
+	m.remember(plural(len(tracks), "track") + " added")
 	m.playlist = append(m.playlist, tracks...)
 	m.edited()
 	cmds := []tea.Cmd{m.readMeta(tracks)}
@@ -1266,6 +1308,7 @@ func (m *Model) removeFromPlaylist(i int) {
 	if i < 0 || i >= len(m.playlist) {
 		return
 	}
+	m.remember("track removed")
 	if c := m.currentIndex(); c == i {
 		m.curHint = i // keep the place so "next" continues here
 	} else if c > i {
@@ -1281,6 +1324,7 @@ func (m *Model) movePlaylist(i, d int) {
 	if i < 0 || j < 0 || i >= len(m.playlist) || j >= len(m.playlist) {
 		return
 	}
+	m.remember("track moved")
 	m.playlist[i], m.playlist[j] = m.playlist[j], m.playlist[i]
 	m.edited()
 	m.plCursor = j
@@ -1450,6 +1494,8 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.remaining = !m.remaining
 	case key.Matches(msg, k.Tape):
 		m.toggleTape()
+	case key.Matches(msg, k.Undo):
+		return m.undo()
 	case key.Matches(msg, k.Search):
 		m.tab = tabLibrary
 		return m.startSearch()
