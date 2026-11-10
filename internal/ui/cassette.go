@@ -32,18 +32,6 @@ func (c *canvas) set(x, y int, layer uint8) {
 	c.layer[i] = max(c.layer[i], layer)
 }
 
-// ring sets all dots whose centre lies between radius r0 and r1 of (cx, cy).
-func (c *canvas) ring(cx, cy, r0, r1 float64, layer uint8, skip func(d float64) bool) {
-	for y := int(cy - r1 - 1); y <= int(cy+r1+1); y++ {
-		for x := int(cx - r1 - 1); x <= int(cx+r1+1); x++ {
-			d := math.Hypot(float64(x)-cx, float64(y)-cy)
-			if d >= r0 && d <= r1 && (skip == nil || !skip(d)) {
-				c.set(x, y, layer)
-			}
-		}
-	}
-}
-
 func (c *canvas) line(x0, y0, x1, y1 float64, layer uint8) {
 	n := int(math.Ceil(math.Hypot(x1-x0, y1-y0)*2.5)) + 1
 	for i := 0; i <= n; i++ {
@@ -215,9 +203,12 @@ func (m *Model) reelWindow(cols, rows int) []string {
 	dw, dh := float64(cols*2), float64(rows*4)
 	cy := (dh - 1) / 2
 	cxL, cxR := (dw-1)*0.25, (dw-1)*0.75
-	hubR := math.Max(2.8, dh*0.24)
+	hubR := hubRadius(dh)
 	rMin := hubR + 0.8
-	rMax := math.Min(dh/2+0.4, (cxR-cxL)-rMin-1.5)
+	// A full pack fills the height of the window, and in a low window it is
+	// wider than that and cut off above and below, as it is by the window of
+	// a real cassette: the hub leaves too little room for it otherwise.
+	rMax := math.Min(math.Max(dh/2+0.4, hubR+4.3), (cxR-cxL)-rMin-1.5)
 	// Tape length is proportional to the pack's area, so the radius follows
 	// the square root of the remaining fraction.
 	p := m.progress()
@@ -304,18 +295,47 @@ func (m *Model) reelWindow(cols, rows int) []string {
 	return out
 }
 
-// drawHub draws a reel hub: a ring with three spokes around the spindle
-// hole. Spokes are two dots wide so the rotation stays legible at braille
-// resolution.
+// hubRadius is the radius of a reel hub in a window dh dots high. A low
+// window gets a hub that is larger for its height: below some four dots of
+// radius there is no telling that it turns.
+func hubRadius(dh float64) float64 {
+	return math.Max(3.7, dh*0.24)
+}
+
+// drawHub draws a reel hub: a ring with spokes around the spindle hole. A
+// dot is set by how far its centre is from the middle of a spoke, which
+// keeps the spokes the same width at every angle; drawn as lines they grow
+// and shrink while they turn. A small hub has one spoke only: three of them
+// run into each other, and a single one shows the rotation.
 func drawHub(cv *canvas, cx, cy, r, angle float64) {
-	cv.ring(cx, cy, r-0.6, r+0.45, layerHub, nil)
-	const spokes, inner = 3, 0.3
-	for k := 0; k < spokes; k++ {
-		a := angle + float64(k)*2*math.Pi/spokes
-		cs, sn := math.Cos(a), math.Sin(a)
-		for _, off := range []float64{-0.35, 0.35} {
-			ox, oy := -sn*off, cs*off
-			cv.line(cx+cs*r*inner+ox, cy+sn*r*inner+oy, cx+cs*r+ox, cy+sn*r+oy, layerHub)
+	spokes, inner, half := 3, 0.3*r, 1.0
+	if r < 4.5 {
+		spokes, inner, half = 1, 0, 0.9
+	}
+	type dir struct{ cs, sn float64 }
+	dirs := make([]dir, spokes)
+	for k := range dirs {
+		a := angle + float64(k)*2*math.Pi/float64(spokes)
+		dirs[k] = dir{math.Cos(a), math.Sin(a)}
+	}
+	for y := int(cy - r - 1); y <= int(cy+r+1); y++ {
+		for x := int(cx - r - 1); x <= int(cx+r+1); x++ {
+			dx, dy := float64(x)-cx, float64(y)-cy
+			d := math.Hypot(dx, dy)
+			if d > r+0.45 {
+				continue
+			}
+			on := d >= r-0.6
+			for _, s := range dirs {
+				if on {
+					break
+				}
+				along, across := dx*s.cs+dy*s.sn, dy*s.cs-dx*s.sn
+				on = along >= inner && math.Abs(across) <= half
+			}
+			if on {
+				cv.set(x, y, layerHub)
+			}
 		}
 	}
 }
