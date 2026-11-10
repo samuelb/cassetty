@@ -1,0 +1,24 @@
+# Dependabot proposes updates of the Go modules and of the actions the
+# workflows use. The workflows pin every action to a commit, which nothing
+# else would ever move on. One pull request a week for each of the two.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ["*"]
