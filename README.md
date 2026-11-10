@@ -263,8 +263,9 @@ started by hand. It runs the tests, lets [git-cliff](https://git-cliff.org)
 pick the next version from the
 [Conventional Commits](https://www.conventionalcommits.org) since the last
 tag (or applies the bump you choose), builds the macOS and Linux archives for
-amd64 and arm64, then tags the commit and publishes a GitHub release with
-notes, checksums and build provenance. A dry run builds everything without
+amd64 and arm64, each with the licenses of what it is built from, then tags
+the commit and publishes a GitHub release with notes, checksums and build
+provenance. A dry run builds everything without
 publishing.
 
 ```sh

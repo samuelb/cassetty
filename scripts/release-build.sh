@@ -1,9 +1,12 @@
 #!/bin/bash
 # Builds the release archives: cassetty for macOS and Linux on amd64 and
-# arm64, each packed with README.md, LICENSE and NOTICE as
-# cassetty_<os>_<arch>.tar.gz, plus checksums.txt. The names carry no
-# version, so releases/latest/download/<name> stays a stable link for the
-# website and the install one-liner.
+# arm64, each packed with README.md, LICENSE, NOTICE and
+# THIRD_PARTY_LICENSES as cassetty_<os>_<arch>.tar.gz, plus checksums.txt.
+# The names carry no version, so releases/latest/download/<name> stays a
+# stable link for the website and the install one-liner.
+#
+# THIRD_PARTY_LICENSES holds the licenses of the Go modules compiled into
+# that binary and of Go itself, see scripts/third-party-licenses.sh.
 #
 # Go's linker signs every macOS binary as "a.out", the name macOS shows for
 # cassetty in Control Center's Now Playing, so the macOS binaries are
@@ -45,7 +48,9 @@ for target in darwin/amd64 darwin/arm64 linux/amd64 linux/arm64; do
 		codesign --verify --strict "$stage/$name/cassetty"
 	fi
 	cp README.md LICENSE NOTICE "$stage/$name/"
-	COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage/$name" cassetty README.md LICENSE NOTICE
+	scripts/third-party-licenses.sh "$os" "$arch" >"$stage/$name/THIRD_PARTY_LICENSES"
+	COPYFILE_DISABLE=1 tar -czf "$out/$name.tar.gz" -C "$stage/$name" \
+		cassetty README.md LICENSE NOTICE THIRD_PARTY_LICENSES
 done
 
 cd "$out"

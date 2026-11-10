@@ -2,3 +2,7 @@ cassetty
 Copyright 2026 Samuel Barabas
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+cassetty is built with Go and with Go modules of other authors, which come
+under licenses of their own. The release archives list them, each with its
+license, in THIRD_PARTY_LICENSES.
