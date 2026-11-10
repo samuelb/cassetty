@@ -73,8 +73,8 @@ func (m *Model) handleRemote(c nowplaying.Command) tea.Cmd {
 // syncNowPlaying tells the system what is playing. It runs after every
 // message; the session passes on only real changes.
 func (m *Model) syncNowPlaying() {
-	if m.remote == nil {
-		return
+	if m.remote == nil || m.engine.Winding() {
+		return // where the tape is wound to is told once it is there
 	}
 	info := nowplaying.Info{
 		Volume:  float64(m.volume) / 100,

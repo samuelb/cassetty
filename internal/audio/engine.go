@@ -29,9 +29,10 @@ const idleSuspendDelay = time.Second
 // Engine owns the audio output and the deck that is permanently attached to
 // it. All methods are safe for concurrent use.
 //
-// Position, Speed, Ended, SetVolume and Snapshot return at once, also while
-// the output is held up reading a track from a disk that takes its time.
-// The methods that change what plays wait for such a read to return.
+// Position, Speed, Winding, Ended, SetVolume and Snapshot return at once,
+// also while the output is held up reading a track from a disk that takes
+// its time. The methods that change what plays wait for such a read to
+// return.
 type Engine struct {
 	deck    *deck
 	events  chan Event
@@ -141,6 +142,7 @@ func (e *Engine) Start(src *Source, play bool) uint64 {
 	d.src = src
 	d.stream = stream
 	d.next, d.nextStream, d.nextGen = nil, nil, 0
+	d.stopWind()
 	d.setPlaying(play)
 	if !play {
 		d.tape.motor = 0 // a new tape does not wind down from where the old one was
@@ -195,6 +197,7 @@ func (e *Engine) Eject() {
 	d.src, d.stream = nil, nil
 	d.next, d.nextStream, d.nextGen = nil, nil, 0
 	d.playing = false
+	d.tape.wind = nil
 	d.tape.motor = 0
 	d.tape.reset()
 	d.publish()
@@ -229,7 +232,9 @@ func (e *Engine) SetTape(on bool) {
 }
 
 // Speed returns how fast the tape moves: 0 when it stands still, 1 when it
-// plays, and in between while it winds up or down.
+// plays, and in between while it winds up or down. While it winds fast
+// forward the speed is many times that of playing, and while it rewinds it
+// is negative, see Wind.
 func (e *Engine) Speed() float64 {
 	return math.Float64frombits(e.deck.speed.Load())
 }
@@ -239,7 +244,8 @@ func (e *Engine) Speed() float64 {
 // seek or to start another track.
 func (e *Engine) Ended() bool { return e.deck.over.Load() }
 
-// Seek moves the play head of the loaded track to t.
+// Seek moves the play head of the loaded track to t at once, as no tape
+// could: Wind is how a deck gets there.
 func (e *Engine) Seek(t time.Duration) error {
 	d := e.deck
 	d.mu.Lock()
@@ -247,6 +253,7 @@ func (e *Engine) Seek(t time.Duration) error {
 	if d.src == nil {
 		return errNoSource
 	}
+	d.stopWind()
 	if err := d.src.seek(t); err != nil {
 		return err
 	}
@@ -261,6 +268,42 @@ func (e *Engine) Seek(t time.Duration) error {
 	d.changed()
 	return nil
 }
+
+// Wind moves the play head of the loaded track on by the given time, or
+// back by a negative one, the way a deck does: the tape runs fast forward
+// or back until the head is there, and while the deck plays the music is
+// heard racing by. Winding again before the head is there adds to how far
+// it goes; a deck that is asked for much more than it winds in a moment
+// gets less far, so that a key held down winds the tape for as long as it
+// is held. Position and Speed tell where the head is meanwhile and how fast
+// the tape moves.
+func (e *Engine) Wind(by time.Duration) error {
+	d := e.deck
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.src == nil {
+		return errNoSource
+	}
+	if d.tape.wind == nil {
+		if d.src.format.SampleRate == SampleRate {
+			// What the transport has read ahead are frames of the track,
+			// but for those of the track before it that still play: the
+			// tape winds on from the very frame the head is at.
+			d.src.putBack(d.tape.unread())
+		}
+		d.tape.reset()
+		d.tape.wind = newWinder(d.src, d.tape.motor, d.playing)
+	}
+	d.tape.wind.aim(by)
+	d.ended = false
+	d.publish()
+	d.changed()
+	return nil
+}
+
+// Winding reports whether the tape is being wound, see Wind: from when it is
+// asked to until the head is where it was to go.
+func (e *Engine) Winding() bool { return e.deck.winds.Load() }
 
 // Position returns the play head position of the loaded track.
 func (e *Engine) Position() time.Duration {
@@ -280,15 +323,20 @@ func (e *Engine) Snapshot(dst [][2]float64) {
 	e.deck.tap.read(dst, e.latency)
 }
 
-// seek moves the decoder to t. A decoder that panics, as some do on a
-// damaged file, fails to seek.
-func (s *Source) seek(t time.Duration) (err error) {
+// seek moves the decoder to t.
+func (s *Source) seek(t time.Duration) error {
+	return s.seekFrame(s.format.SampleRate.N(t))
+}
+
+// seekFrame moves the decoder to frame n of the source. A decoder that
+// panics, as some do on a damaged file, fails to seek.
+func (s *Source) seekFrame(n int) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = damaged(r)
 		}
 	}()
-	n := s.format.SampleRate.N(t)
+	s.ahead = nil
 	if n < 0 {
 		n = 0
 	}
@@ -304,9 +352,9 @@ func wrapStream(src *Source) beep.Streamer {
 		return nil
 	}
 	if src.format.SampleRate == SampleRate {
-		return src.stream
+		return reader{src}
 	}
-	return beep.Resample(4, src.format.SampleRate, SampleRate, src.stream)
+	return beep.Resample(4, src.format.SampleRate, SampleRate, reader{src})
 }
 
 // deck is the single streamer attached to the output. It never drains: when
@@ -336,6 +384,7 @@ type deck struct {
 	// seconds, and the player must not stand still for it. See publish.
 	pos   atomic.Int64  // play head of the loaded track, a time.Duration
 	speed atomic.Uint64 // tape speed, a float64, see Engine.Speed
+	winds atomic.Bool   // see Engine.Winding
 	over  atomic.Bool   // see Engine.Ended
 	gain  atomic.Uint64 // output gain, a float64
 }
@@ -352,8 +401,12 @@ func newDeck(events chan<- Event) *deck {
 // changes one of them calls it; the caller must hold d.mu.
 func (d *deck) publish() {
 	var pos time.Duration
-	if d.src != nil {
-		pos = d.src.format.SampleRate.D(d.src.stream.Position())
+	switch {
+	case d.src == nil:
+	case d.tape.wind != nil:
+		pos = d.src.format.SampleRate.D(int(d.tape.wind.pos))
+	default:
+		pos = d.src.format.SampleRate.D(d.src.position())
 	}
 	d.pos.Store(int64(pos))
 	speed := 0.0
@@ -361,13 +414,14 @@ func (d *deck) publish() {
 		speed = d.tape.motor
 	}
 	d.speed.Store(math.Float64bits(speed))
+	d.winds.Store(d.tape.wind != nil)
 	d.over.Store(d.stream != nil && d.ended)
 }
 
 // idle reports whether the deck has nothing to play and emits silence.
 // The caller must hold d.mu.
 func (d *deck) idle() bool {
-	return d.stream == nil || d.ended || (!d.playing && d.tape.motor == 0)
+	return d.stream == nil || d.ended || (!d.playing && d.tape.motor == 0 && d.tape.wind == nil)
 }
 
 // setPlaying starts or stops the tape. With the tape sound on the motor
@@ -442,6 +496,12 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 	}
 
 	n := d.tape.process(samples, d.playing, d.pull)
+	if w := d.tape.wind; w != nil && w.done {
+		d.land()
+		if !d.idle() {
+			n += d.tape.process(samples[n:], d.playing, d.pull)
+		}
+	}
 	if n > 0 {
 		d.tap.write(samples[:n])
 		gain := math.Float64frombits(d.gain.Load())
@@ -456,6 +516,39 @@ func (d *deck) Stream(samples [][2]float64) (int, bool) {
 		d.changed() // the tape has wound down, so the output can be suspended
 	}
 	return len(samples), true
+}
+
+// stopWind breaks off a wind, for the tape to be put somewhere else: the
+// motor is back at a speed of playing. The caller must hold d.mu.
+func (d *deck) stopWind() {
+	if d.tape.wind == nil {
+		return
+	}
+	d.tape.wind = nil
+	d.tape.motor = 0
+	if d.playing {
+		d.tape.motor = 1
+	}
+}
+
+// land ends a wind that got to where it was to go: the tape plays on from
+// where the head is, or stands there. A decoder that failed while winding is
+// told to seek there instead, and a track that cannot do that either is
+// over, as one that breaks off while it plays. The caller must hold d.mu.
+func (d *deck) land() {
+	w := d.tape.wind
+	d.stopWind()
+	d.tape.reset()
+	if err := w.release(); err != nil {
+		d.ended = true
+		d.changed()
+		select {
+		case d.events <- Event{Gen: d.gen, Err: err}:
+		default:
+		}
+		return
+	}
+	d.stream = wrapStream(d.src) // no stale frames from before the wind
 }
 
 // fill streams the loaded track into samples and returns how many frames it

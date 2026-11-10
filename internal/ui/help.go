@@ -19,8 +19,8 @@ func (m *Model) helpSections() []helpSection {
 		{"space p", "play / pause"},
 		{"s v", "stop"},
 		{"z b", "previous · next  (< > n)"},
-		{"← →", fmt.Sprintf("seek %ds", step)},
-		{"⇧← ⇧→", fmt.Sprintf("seek %ds  ([ ])", 6*step)},
+		{"← →", fmt.Sprintf("rewind · forward %ds", step)},
+		{"⇧← ⇧→", fmt.Sprintf("the same by %ds  ([ ])", 6*step)},
 		{"+ - m", "volume · mute"},
 		{"e", "eject the tape"},
 	}

@@ -37,9 +37,9 @@ func (m *Model) latched(id string) bool {
 	case "btn:stop":
 		return m.src != nil && m.state == stateStopped
 	case "btn:rew":
-		return m.spin < -0.5
+		return m.spin < -0.5 || m.winding() < 0
 	case "btn:ff":
-		return m.spin > 0.5
+		return m.spin > 0.5 || m.winding() > 0
 	}
 	return false
 }
