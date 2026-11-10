@@ -402,8 +402,8 @@ func (m *Model) renderBrowser(w, h int) string {
 	rows := h - 2
 
 	var body []string
-	switch {
-	case m.tab == tabLibrary:
+	switch m.tab {
+	case tabLibrary:
 		if m.search.on {
 			p.right = m.searchLabel(inner - title.w - 6)
 		} else {

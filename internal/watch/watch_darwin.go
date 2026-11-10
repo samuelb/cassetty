@@ -82,7 +82,7 @@ func (w *Watcher) Watch(dir string) error {
 }
 
 // Close stops the watcher and releases its handles.
-func (w *Watcher) Close() error {
+func (w *Watcher) Close() (err error) {
 	w.once.Do(func() {
 		w.mu.Lock()
 		w.closed = true
@@ -90,9 +90,9 @@ func (w *Watcher) Close() error {
 		var ev unix.Kevent_t
 		unix.SetKevent(&ev, closeIdent, unix.EVFILT_USER, 0)
 		ev.Fflags = unix.NOTE_TRIGGER
-		unix.Kevent(w.kq, []unix.Kevent_t{ev}, nil, nil)
+		_, err = unix.Kevent(w.kq, []unix.Kevent_t{ev}, nil, nil)
 	})
-	return nil
+	return err
 }
 
 func (w *Watcher) loop() {

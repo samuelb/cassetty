@@ -112,7 +112,7 @@ func (e *Engine) close() {
 	if e.null != nil {
 		e.null.stop()
 	} else if e.player != nil {
-		e.player.Close()
+		e.player.Pause()
 	}
 	e.deck.mu.Lock()
 	src, next := e.deck.src, e.deck.next
@@ -413,8 +413,9 @@ func (d *deck) suspendWhenIdle(out output, delay time.Duration, done <-chan stru
 			d.mu.Unlock()
 			if !idle {
 				timer.Stop()
-				if suspended {
-					out.Resume()
+				// An output that fails to resume is asked again the next
+				// time something is to play.
+				if suspended && out.Resume() == nil {
 					suspended = false
 				}
 			} else if !suspended {
@@ -424,8 +425,7 @@ func (d *deck) suspendWhenIdle(out output, delay time.Duration, done <-chan stru
 			d.mu.Lock()
 			idle := d.idle()
 			d.mu.Unlock()
-			if idle && !suspended {
-				out.Suspend()
+			if idle && !suspended && out.Suspend() == nil {
 				suspended = true
 			}
 		}

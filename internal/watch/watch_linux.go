@@ -49,7 +49,8 @@ func (w *Watcher) Watch(dir string) error {
 		return err
 	}
 	if w.wd >= 0 && w.wd != wd {
-		unix.InotifyRmWatch(w.fd, uint32(w.wd))
+		// The folder watched before may be gone, and its watch with it.
+		_, _ = unix.InotifyRmWatch(w.fd, uint32(w.wd))
 	}
 	w.wd = wd
 	return nil

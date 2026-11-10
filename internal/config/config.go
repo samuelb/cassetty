@@ -263,7 +263,7 @@ func SaveState(root string, s State) error {
 		f.Libraries = map[string]Session{}
 	}
 	f.Libraries[root] = s.Session
-	if s.Session.empty(root) {
+	if s.empty(root) {
 		delete(f.Libraries, root)
 	}
 	b, err := json.MarshalIndent(f, "", "  ")

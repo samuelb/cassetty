@@ -112,12 +112,13 @@ flags:
 		volume = *state.Volume
 	}
 
+	// There is an engine either way: without a device it runs silent.
 	engine, initErr := audio.NewEngine(*silent)
-	defer engine.Close()
 	notice := ""
 	if initErr != nil {
 		notice = "no audio device (" + initErr.Error() + ") — running silent"
 	}
+	defer engine.Close()
 	// Media keys and the Now Playing widget, where the system has them.
 	remote, err := nowplaying.Start()
 	if err == nil {

@@ -223,9 +223,10 @@ func (m *Model) handleMouse(msg tea.MouseMsg) tea.Cmd {
 	}
 	if m.showHelp {
 		if w, ok := msg.(tea.MouseWheelMsg); ok {
-			if w.Button == tea.MouseWheelUp {
+			switch w.Button {
+			case tea.MouseWheelUp:
 				m.helpOffset = max(0, m.helpOffset-2)
-			} else if w.Button == tea.MouseWheelDown {
+			case tea.MouseWheelDown:
 				m.helpOffset += 2
 			}
 		}

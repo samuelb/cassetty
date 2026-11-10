@@ -1,0 +1,26 @@
+# golangci-lint (https://golangci-lint.run), run by the CI workflow.
+version: "2"
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck and unused.
+  default: standard
+  settings:
+    errcheck:
+      # What is closed, removed or stopped on the way out has nobody to
+      # report to: the call that mattered has returned by then.
+      exclude-functions:
+        - (io.Closer).Close
+        - (*os.File).Close
+        - os.Remove
+        - golang.org/x/sys/unix.Close
+        - (*os/exec.Cmd).Wait
+        - (*github.com/godbus/dbus/v5.Conn).Close
+        - (*github.com/samuelb/cassetty/internal/audio.Source).Close
+        - (*github.com/samuelb/cassetty/internal/watch.Watcher).Close
+  exclusions:
+    rules:
+      # Tests set their folders up without checking every call: what goes
+      # wrong there fails the test a line later.
+      - path: _test\.go
+        linters:
+          - errcheck
