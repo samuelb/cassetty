@@ -146,6 +146,8 @@ flags:
 		Notice:          notice,
 		Resume:          state.Playback,
 		Save:            save,
+
+		AnimateUnfocused: cfg.AnimateUnfocused,
 	})
 	// Also after an error: the terminal may have gone away mid-session.
 	keep.finish(m.State())

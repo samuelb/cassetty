@@ -195,8 +195,14 @@ volume = 70                # initial volume in percent
 show_hidden = false        # list dot files and folders
 nerd_font = true           # browser icons from a Nerd Font (false: symbols every font has)
 paint_background = true    # paint the terminal background in the theme color (silverface always does)
+animate_unfocused = false  # full motion also while the terminal is unfocused (false: 4 frames a second)
 seek_step = 5              # seconds for ←/→ (shift = 6x)
 ```
+
+While its terminal is not focused, in a tab or a window behind another,
+cassetty draws four frames a second instead of twenty-five, which takes a
+third of the processor time. If you watch the deck from another window, set
+`animate_unfocused = true`.
 
 cassetty picks up where you left off: it remembers the playlist, the track
 in the deck and how far into it you were, and the next start loads that

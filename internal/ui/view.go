@@ -60,6 +60,7 @@ func (m *Model) View() tea.View {
 	var v tea.View
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
+	v.ReportFocus = !m.opts.AnimateUnfocused // to slow down while unfocused
 	v.WindowTitle = "cassetty"
 	if m.src != nil {
 		v.WindowTitle = map[playState]string{statePlaying: "▶ ", statePaused: "▮▮ ", stateStopped: "■ "}[m.state] +
