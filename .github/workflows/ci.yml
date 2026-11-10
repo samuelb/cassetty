@@ -66,6 +66,31 @@ jobs:
           GOOS=darwin golangci-lint run
           GOOS=windows golangci-lint run
 
+  # Only macOS and Linux are tested and released. The code also has what it
+  # takes to run without media keys and without a folder watcher, as on
+  # Windows, and with MPRIS on the BSDs, and nothing else builds those
+  # parts: building for a few such systems keeps them from rotting.
+  cross:
+    name: Build for other systems
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build and vet
+        run: |
+          for target in windows/amd64 openbsd/amd64 netbsd/amd64; do
+            echo "::group::$target"
+            export GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0
+            go build -o /dev/null .
+            go vet ./...
+            echo "::endgroup::"
+          done
+
   # The release archives, built the way the Release workflow builds them:
   # all four targets on one macOS runner, which also re-signs the macOS
   # binaries.
