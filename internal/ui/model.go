@@ -72,15 +72,12 @@ type Options struct {
 	Repeat          string
 	Tape            bool // start with the tape sound on
 	PaintBackground bool
-	// AnimateUnfocused keeps the full frame rate while the terminal is not
-	// focused, see unfocusedTick.
-	AnimateUnfocused bool
-	SeekStep         time.Duration
-	Formats          library.Formats
-	Engine           *audio.Engine
-	NowPlaying       *nowplaying.Session // media keys; nil where unsupported
-	Notice           string              // shown once at startup
-	Resume           config.Playback     // where the last run left off
+	SeekStep        time.Duration
+	Formats         library.Formats
+	Engine          *audio.Engine
+	NowPlaying      *nowplaying.Session // media keys; nil where unsupported
+	Notice          string              // shown once at startup
+	Resume          config.Playback     // where the last run left off
 	// Save stores the state while cassetty runs, so that it is not lost
 	// should cassetty not get to quit; nil keeps it to the caller, see State.
 	Save func(config.State) error
@@ -153,7 +150,6 @@ type Model struct {
 	// animation
 	tickID         int
 	lastTick       time.Time
-	blurred        bool // the terminal told that it lost the focus
 	angleL, angleR float64
 	spin           float64
 	spectrum       *viz.Spectrum
@@ -478,21 +474,14 @@ func (m *Model) animating() bool {
 
 // The time between two frames.
 const (
-	frameTick = 40 * time.Millisecond // while something moves
-	// While the terminal is not focused: it is in a tab or a window behind
-	// another, or at least not what is being looked at, and drawing the
-	// deck in full motion costs most of what cassetty takes of the
-	// processor. Terminals that do not tell of the focus never slow down.
-	unfocusedTick = 250 * time.Millisecond
-	pausedTick    = 250 * time.Millisecond // the clock blinks
-	idleTick      = 500 * time.Millisecond
+	frameTick  = 40 * time.Millisecond  // while something moves
+	pausedTick = 250 * time.Millisecond // the clock blinks
+	idleTick   = 500 * time.Millisecond
 )
 
 // tickEvery returns the time to the next frame.
 func (m *Model) tickEvery() time.Duration {
 	switch {
-	case m.animating() && m.blurred && !m.opts.AnimateUnfocused:
-		return unfocusedTick
 	case m.animating():
 		return frameTick
 	case m.state == statePaused:
@@ -632,14 +621,6 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case savedMsg:
 		m.saving, m.stored = false, msg.mark
 		return m, nil
-
-	case tea.BlurMsg:
-		m.blurred = true
-		return m, nil
-
-	case tea.FocusMsg:
-		m.blurred = false
-		return m, m.kickTick() // at full speed again, from now
 
 	case tea.KeyPressMsg:
 		return m, m.handleKey(msg)

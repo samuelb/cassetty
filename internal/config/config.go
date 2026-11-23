@@ -36,10 +36,6 @@ type Config struct {
 	NerdFont bool `toml:"nerd_font"`
 	// PaintBackground sets the terminal background to the theme color.
 	PaintBackground bool `toml:"paint_background"`
-	// AnimateUnfocused draws the deck in full motion also while the
-	// terminal is not focused. Without it the display slows down to four
-	// frames a second then, which takes far less of the processor.
-	AnimateUnfocused bool `toml:"animate_unfocused"`
 	// SeekStep is how far the arrow keys wind the tape, in seconds.
 	SeekStep int `toml:"seek_step"`
 }
@@ -158,14 +154,6 @@ nerd_font = true
 # Paint the terminal background with the theme color while running. The light
 # silverface theme always paints it, as its dark text needs the light background.
 paint_background = true
-
-# Draw the deck in full motion also while the terminal is not focused: in a
-# tab or a window behind another, or next to the one you work in. Unfocused,
-# the display otherwise slows down to four frames a second, which takes far
-# less of the processor and of the battery. Set this to true if you watch
-# the deck from another window. It makes no difference in a terminal that
-# does not tell programs of the focus.
-animate_unfocused = false
 
 # How far the left/right arrow keys wind the tape, in seconds (shift = 6x).
 seek_step = 5
