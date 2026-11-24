@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestParentFolderEntry(t *testing.T) {
@@ -86,6 +88,60 @@ func TestParentFolderEntry(t *testing.T) {
 	press(m, "enter")
 	if m.dir != filepath.Join(root, "Artist") {
 		t.Fatalf("enter in the empty folder went to %s", m.dir)
+	}
+}
+
+func TestFileInfoColumns(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]int64{"a.mp3": 5, "b.flac": 2000, "c.wav": 12_345_678, "d.ogg": 999_000}
+	for name, size := range files {
+		p := filepath.Join(root, name)
+		touch(t, p, 0)
+		if err := os.Truncate(p, size); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newTestModel(t, root)
+	f := checkFrame(t, m, 100, 30)
+	extCol, sizeEnd := -1, -1
+	for name := range files {
+		var row string
+		for _, l := range strings.Split(f, "\n") {
+			if strings.Contains(l, name) {
+				row = l
+			}
+		}
+		if row == "" {
+			t.Fatalf("no row for %s in\n%s", name, f)
+		}
+		at := strings.Index(row, name) + len(name)
+		ext := strings.ToUpper(strings.TrimPrefix(filepath.Ext(name), "."))
+		i := at + strings.Index(row[at:], " "+ext+" ") + 1
+		j := at + strings.Index(row[at:], "B ") + 1
+		col, end := ansi.StringWidth(row[:i]), ansi.StringWidth(row[:j])
+		if extCol == -1 {
+			extCol, sizeEnd = col, end
+		}
+		if col != extCol || end != sizeEnd {
+			t.Errorf("%s: format at %d and size ending at %d, others at %d and %d:\n%s", name, col, end, extCol, sizeEnd, f)
+		}
+	}
+}
+
+func TestHumanSize(t *testing.T) {
+	cases := map[int64]string{
+		0: "0 B", 999: "999 B", 1000: "1.0 KB", 1536: "1.5 KB",
+		1_023_900: "999.9 KB", 1_023_950: "1.0 MB", 1 << 20: "1.0 MB",
+		12_345_678: "11.8 MB", 1 << 40: "1.0 TB",
+	}
+	for n, want := range cases {
+		got := humanSize(n)
+		if got != want {
+			t.Errorf("humanSize(%d) = %q, want %q", n, got, want)
+		}
+		if len(got) > sizeW {
+			t.Errorf("humanSize(%d) = %q is wider than %d", n, got, sizeW)
+		}
 	}
 }
 

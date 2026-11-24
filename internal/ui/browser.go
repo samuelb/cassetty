@@ -618,6 +618,10 @@ func (m *Model) libraryRows(w, rows int) []string {
 		playing = m.cur.Path
 	}
 	icons := m.icons()
+	extW := 0
+	for ext := range m.opts.Formats {
+		extW = max(extW, len(ext))
+	}
 	out := make([]string, 0, rows)
 	for r := 0; r < rows; r++ {
 		i := m.offset + r
@@ -650,10 +654,10 @@ func (m *Model) libraryRows(w, rows int) []string {
 			icon = m.nowPlayingGlyph()
 			iconStyle = base.Foreground(t.Accent)
 			nameStyle = base.Foreground(t.Accent).Bold(true)
-			right = strings.ToUpper(e.Ext()) + "  " + humanSize(e.Size)
+			right = fileInfo(e, extW)
 		default:
 			icon = icons.track
-			right = strings.ToUpper(e.Ext()) + "  " + humanSize(e.Size)
+			right = fileInfo(e, extW)
 		}
 		lb.add(iconStyle, " "+icon+" ")
 		name := e.Name
@@ -798,15 +802,26 @@ func (m *Model) emptyState(w, rows int, st lipgloss.Style, title, hint string) [
 	return out
 }
 
+// fileInfo is the format and size of a file, in columns that line up from
+// row to row: the format left aligned in extW columns, the size right
+// aligned in sizeW.
+func fileInfo(e library.Entry, extW int) string {
+	return fmt.Sprintf("%-*s  %*s", extW, strings.ToUpper(e.Ext()), sizeW, humanSize(e.Size))
+}
+
+// sizeW is the widest a humanSize can be, as in "999.9 MB".
+const sizeW = 8
+
+// humanSize writes n with at most three digits before the point: a size of
+// 1000 or more of a unit is written in the next one up.
 func humanSize(n int64) string {
-	const unit = 1024
-	if n < unit {
+	if n < 1000 {
 		return fmt.Sprintf("%d B", n)
 	}
-	div, exp := int64(unit), 0
-	for v := n / unit; v >= unit; v /= unit {
-		div *= unit
+	v, exp := float64(n)/1024, 0
+	for v >= 999.95 && exp < 3 {
+		v /= 1024
 		exp++
 	}
-	return fmt.Sprintf("%.1f %cB", float64(n)/float64(div), "KMGT"[exp])
+	return fmt.Sprintf("%.1f %cB", v, "KMGT"[exp])
 }
