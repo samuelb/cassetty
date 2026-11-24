@@ -6,7 +6,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// Theme is a "skin": the full palette of the player.
+// Theme is the full palette of the player.
 type Theme struct {
 	Name string
 

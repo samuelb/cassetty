@@ -15,12 +15,12 @@
   <a href="#install">Install</a> ·
   <a href="#usage">Usage</a> ·
   <a href="#keys">Keys</a> ·
-  <a href="#skins">Skins</a> ·
+  <a href="#themes">Themes</a> ·
   <a href="#configuration">Configuration</a>
 </p>
 
 <p align="center">
-  <img src="docs/media/demo.gif" alt="cassetty browsing a library, playing an album and cycling through its skins" width="100%">
+  <img src="docs/media/demo.gif" alt="cassetty browsing a library, playing an album and cycling through its themes" width="100%">
 </p>
 
 A cassette deck music player for your terminal.
@@ -182,25 +182,25 @@ everything else from normal tape (type I), which hisses the most. cassetty
 remembers the setting; with it off, the decoded audio plays unchanged once
 the tape is up to speed.
 
-## Skins
+## Themes
 
 Press `t` to cycle, pass `-theme`, or set `theme` in the config.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/media/sunbleached.png" alt="sunbleached skin"><br><b>sunbleached</b> · faded rainbow (default)</td>
-    <td width="50%"><img src="docs/media/silverface.png" alt="silverface skin"><br><b>silverface</b> · brushed aluminium hi-fi</td>
+    <td width="50%"><img src="docs/media/sunbleached.png" alt="sunbleached theme"><br><b>sunbleached</b> · faded rainbow (default)</td>
+    <td width="50%"><img src="docs/media/silverface.png" alt="silverface theme"><br><b>silverface</b> · brushed aluminium hi-fi</td>
   </tr>
   <tr>
-    <td><img src="docs/media/cyberdeck.png" alt="cyberdeck skin"><br><b>cyberdeck</b> · yellow, magenta and cyan on black</td>
-    <td><img src="docs/media/classic.png" alt="classic skin"><br><b>classic</b> · green LCD</td>
+    <td><img src="docs/media/cyberdeck.png" alt="cyberdeck theme"><br><b>cyberdeck</b> · yellow, magenta and cyan on black</td>
+    <td><img src="docs/media/classic.png" alt="classic theme"><br><b>classic</b> · green LCD</td>
   </tr>
   <tr>
-    <td><img src="docs/media/amber.png" alt="amber skin"><br><b>amber</b> · amber monochrome</td>
-    <td><img src="docs/media/vfd.png" alt="vfd skin"><br><b>vfd</b> · cyan vacuum fluorescent display</td>
+    <td><img src="docs/media/amber.png" alt="amber theme"><br><b>amber</b> · amber monochrome</td>
+    <td><img src="docs/media/vfd.png" alt="vfd theme"><br><b>vfd</b> · cyan vacuum fluorescent display</td>
   </tr>
   <tr>
-    <td><img src="docs/media/synthwave.png" alt="synthwave skin"><br><b>synthwave</b> · neon pink and blue</td>
+    <td><img src="docs/media/synthwave.png" alt="synthwave theme"><br><b>synthwave</b> · neon pink and blue</td>
     <td></td>
   </tr>
 </table>
@@ -224,7 +224,7 @@ seek_step = 5              # seconds for ←/→ (shift = 6x)
 cassetty picks up where you left off: it remembers the playlist, the track
 in the deck and how far into it you were, and the next start loads that
 track paused at that point, so `space` plays on. It also remembers the
-volume, skin, shuffle, repeat, tape sound and the last folder. The playlist,
+volume, theme, shuffle, repeat, tape sound and the last folder. The playlist,
 the track and the last folder are remembered for each music folder by
 itself, so a start on another folder leaves those of your library alone.
 That state lives in `~/.local/state/cassetty/state.json` (or
@@ -260,7 +260,7 @@ render the parts, `live.go` keeps the shown folder current,
 `remote.go` answers the media keys), `internal/config`.
 
 **Website and demos.** `docs/` is the GitHub Pages site, deployed by
-`.github/workflows/pages.yml`; its skin colors come from
+`.github/workflows/pages.yml`; its theme colors come from
 `internal/ui/theme.go`. `scripts/demo/record.sh` re-records the videos,
 screenshots and `demo.gif` in `docs/media` with
 [vhs](https://github.com/charmbracelet/vhs), playing a generated library.

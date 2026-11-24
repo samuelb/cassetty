@@ -16,7 +16,7 @@
 <link rel="preload" href="fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="site.css">
 <script>
-  // Apply a remembered skin before the first paint.
+  // Apply a remembered theme before the first paint.
   try {
     const t = localStorage.getItem("cassetty-theme");
     if (t) document.documentElement.dataset.theme = t;
@@ -45,20 +45,20 @@
   </section>
 
   <section class="deck wrap" aria-label="Demo">
-    <div class="skins" role="group" aria-label="Skin">
-      <span class="skins-label">SKIN</span>
-      <button type="button" data-skin="sunbleached" aria-pressed="true"><i style="--s1:#e38b86;--s2:#eaa978;--s3:#e8d08a;--s4:#a6c99a;--s5:#8fb8d6"></i>sunbleached</button>
-      <button type="button" data-skin="silverface" aria-pressed="false"><i style="--s1:#1f5a9e;--s2:#3f70aa;--s3:#5f87b5;--s4:#7f9ec0;--s5:#9fb4cc"></i>silverface</button>
-      <button type="button" data-skin="cyberdeck" aria-pressed="false"><i style="--s1:#ff2a6d;--s2:#cd2db6;--s3:#9b30ff;--s4:#4e90ff;--s5:#00f0ff"></i>cyberdeck</button>
-      <button type="button" data-skin="classic" aria-pressed="false"><i style="--s1:#e2522f;--s2:#e6682c;--s3:#ea7e28;--s4:#ee9325;--s5:#f2a922"></i>classic</button>
-      <button type="button" data-skin="amber" aria-pressed="false"><i style="--s1:#7a3b12;--s2:#944f15;--s3:#ad6218;--s4:#c6761b;--s5:#e08a1e"></i>amber</button>
-      <button type="button" data-skin="vfd" aria-pressed="false"><i style="--s1:#2f6fdb;--s2:#3a8ce0;--s3:#44a9e6;--s4:#4ec6eb;--s5:#59e3f0"></i>vfd</button>
-      <button type="button" data-skin="synthwave" aria-pressed="false"><i style="--s1:#ff5fd2;--s2:#de7fdd;--s3:#bda0e8;--s4:#9cc0f4;--s5:#7be0ff"></i>synthwave</button>
-      <span class="skins-hint">or press <kbd>t</kbd></span>
+    <div class="themes" role="group" aria-label="Theme">
+      <span class="themes-label">THEME</span>
+      <button type="button" data-set-theme="sunbleached" aria-pressed="true"><i style="--s1:#e38b86;--s2:#eaa978;--s3:#e8d08a;--s4:#a6c99a;--s5:#8fb8d6"></i>sunbleached</button>
+      <button type="button" data-set-theme="silverface" aria-pressed="false"><i style="--s1:#1f5a9e;--s2:#3f70aa;--s3:#5f87b5;--s4:#7f9ec0;--s5:#9fb4cc"></i>silverface</button>
+      <button type="button" data-set-theme="cyberdeck" aria-pressed="false"><i style="--s1:#ff2a6d;--s2:#cd2db6;--s3:#9b30ff;--s4:#4e90ff;--s5:#00f0ff"></i>cyberdeck</button>
+      <button type="button" data-set-theme="classic" aria-pressed="false"><i style="--s1:#e2522f;--s2:#e6682c;--s3:#ea7e28;--s4:#ee9325;--s5:#f2a922"></i>classic</button>
+      <button type="button" data-set-theme="amber" aria-pressed="false"><i style="--s1:#7a3b12;--s2:#944f15;--s3:#ad6218;--s4:#c6761b;--s5:#e08a1e"></i>amber</button>
+      <button type="button" data-set-theme="vfd" aria-pressed="false"><i style="--s1:#2f6fdb;--s2:#3a8ce0;--s3:#44a9e6;--s4:#4ec6eb;--s5:#59e3f0"></i>vfd</button>
+      <button type="button" data-set-theme="synthwave" aria-pressed="false"><i style="--s1:#ff5fd2;--s2:#de7fdd;--s3:#bda0e8;--s4:#9cc0f4;--s5:#7be0ff"></i>synthwave</button>
+      <span class="themes-hint">or press <kbd>t</kbd></span>
     </div>
 
     <figure class="screen">
-      <div class="screen-bar"><span class="leds" aria-hidden="true"><i></i><i></i><i></i></span><span>cassetty ~/Music</span><span id="skin-name">sunbleached</span></div>
+      <div class="screen-bar"><span class="leds" aria-hidden="true"><i></i><i></i><i></i></span><span>cassetty ~/Music</span><span id="theme-name">sunbleached</span></div>
       <div class="glass">
         <video id="demo" src="media/sunbleached.mp4" poster="media/sunbleached.png" width="1200" height="620" autoplay muted loop playsinline aria-label="cassetty playing an album"></video>
       </div>
@@ -106,7 +106,7 @@
           <li><kbd>[</kbd><kbd>]</kbd><i></i><span>the same by 30 s</span></li>
           <li><kbd>+</kbd><kbd>-</kbd><kbd>m</kbd><i></i><span>volume / mute</span></li>
           <li><kbd>T</kbd><i></i><span>tape sound</span></li>
-          <li><kbd>t</kbd><i></i><span>next skin</span></li>
+          <li><kbd>t</kbd><i></i><span>next theme</span></li>
         </ul>
         <ul aria-label="the library">
           <li><kbd>enter</kbd><i></i><span>open folder · play</span></li>

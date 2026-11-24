@@ -1,4 +1,4 @@
-/* cassetty site. The skin colors below are generated from internal/ui/theme.go. */
+/* cassetty site. The theme colors below are generated from internal/ui/theme.go. */
 
 /* The fonts come from this site, not from a font service, which would learn
    of every visitor. JetBrains Mono and VT323 are under the SIL Open Font
@@ -217,7 +217,7 @@ h1 {
 .specs { margin: 0; color: var(--muted); font-size: 13px; }
 
 /* deck keys */
-.key, .skins button, .copy {
+.key, .themes button, .copy {
   font: inherit;
   color: var(--btn-fg);
   background: var(--btn-bg);
@@ -228,8 +228,8 @@ h1 {
   text-decoration: none;
   transition: background-color .15s, color .15s, transform .08s, box-shadow .08s;
 }
-.key:hover, .skins button:hover, .copy:hover { background: var(--btn-hover); color: var(--btn-fg); }
-.key:active, .skins button:active, .copy:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
+.key:hover, .themes button:hover, .copy:hover { background: var(--btn-hover); color: var(--btn-fg); }
+.key:active, .themes button:active, .copy:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow); }
 
 .dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; max-width: 460px; }
 .key {
@@ -272,18 +272,18 @@ h1 {
 
 /* demo */
 .deck { padding-bottom: 72px; }
-.skins { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 22px; }
-.skins-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .2em; margin-right: 4px; }
-.skins button { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 13px; }
-.skins button i {
+.themes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 22px; }
+.themes-label { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .2em; margin-right: 4px; }
+.themes button { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 13px; }
+.themes button i {
   width: 14px; height: 14px; border-radius: 2px;
   background: linear-gradient(var(--s1) 0 20%, var(--s2) 20% 40%, var(--s3) 40% 60%, var(--s4) 60% 80%, var(--s5) 80%);
 }
-.skins button[aria-pressed="true"] {
+.themes button[aria-pressed="true"] {
   background: var(--accent); color: var(--on-accent); border-color: var(--accent);
   transform: translateY(3px); box-shadow: 0 1px 0 var(--shadow);
 }
-.skins-hint { color: var(--faint); font-size: 12px; margin-left: auto; }
+.themes-hint { color: var(--faint); font-size: 12px; margin-left: auto; }
 
 .screen {
   margin: 0;
@@ -294,7 +294,7 @@ h1 {
   box-shadow: 10px 10px 0 var(--shadow);
 }
 .screen-bar { display: flex; align-items: center; gap: 12px; padding: 0 4px 10px; color: var(--shell-edge); font-size: 12px; letter-spacing: .06em; }
-.screen-bar #skin-name { margin-left: auto; text-transform: uppercase; letter-spacing: .14em; }
+.screen-bar #theme-name { margin-left: auto; text-transform: uppercase; letter-spacing: .14em; }
 .glass { position: relative; overflow: hidden; border-radius: 6px; background: var(--bg); line-height: 0; }
 .glass video { display: block; width: 100%; height: auto; }
 .glass::after {
@@ -464,7 +464,7 @@ footer a { color: var(--muted); }
   /* Keep "Apple Silicon" on one line next to the logo. */
   .key { column-gap: 8px; padding-inline: 10px; }
   .key::after { width: 16px; height: 16px; }
-  .skins-hint { display: none; }
+  .themes-hint { display: none; }
   .screen { padding: 8px; box-shadow: 6px 6px 0 var(--shadow); }
   .screen-bar span:nth-child(2) { display: none; }
   h1 { text-shadow: 2px 2px 0 var(--b1), 4px 4px 0 var(--b2), 6px 6px 0 var(--b3), 8px 8px 0 var(--b4), 10px 10px 0 var(--b5); }
@@ -473,7 +473,7 @@ footer a { color: var(--muted); }
   .dl { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
-  body, .key, .skins button { transition: none; }
+  body, .key, .themes button { transition: none; }
   .crt, .crt::before { animation: none; }
   .crt::before { display: none; }
 }

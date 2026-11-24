@@ -1,11 +1,11 @@
 #!/bin/bash
-# Records the demos in docs/media: a video and a screenshot per skin for the
-# website, and demo.gif (ending in a tour of all skins) for the README.
+# Records the demos in docs/media: a video and a screenshot per theme for the
+# website, and demo.gif (ending in a tour of all themes) for the README.
 #
 # Needs vhs, ffmpeg, ImageMagick, python3 with numpy and the JetBrainsMono
 # Nerd Font (or set CASSETTY_DEMO_FONT).
 #
-# usage: scripts/demo/record.sh [skin...]   (default: all skins and the GIF)
+# usage: scripts/demo/record.sh [theme...]   (default: all themes and the GIF)
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -14,10 +14,10 @@ media=$repo/docs/media
 work=${CASSETTY_DEMO_DIR:-${TMPDIR:-/tmp}/cassetty-demo}
 font=${CASSETTY_DEMO_FONT:-JetBrainsMono Nerd Font Mono}
 
-skins=("$@")
+themes=("$@")
 gif=0
-if [ ${#skins[@]} -eq 0 ]; then
-	skins=(sunbleached silverface cyberdeck classic amber vfd synthwave)
+if [ ${#themes[@]} -eq 0 ]; then
+	themes=(sunbleached silverface cyberdeck classic amber vfd synthwave)
 	gif=1
 fi
 
@@ -26,11 +26,11 @@ mkdir -p "$work/cfg" "$work/state" "$work/out"
 [ -d "$work/Music" ] || python3 "$here/library.py" "$work/Music"
 cd "$work"
 
-# tape <skin> <site|readme> writes the vhs script for one recording.
+# tape <theme> <site|readme> writes the vhs script for one recording.
 tape() {
-	local skin=$1 kind=$2
+	local theme=$1 kind=$2
 	if [ "$kind" = site ]; then
-		echo "Output out/$skin.mp4"
+		echo "Output out/$theme.mp4"
 	else
 		echo "Output out/demo.gif"
 	fi
@@ -47,7 +47,7 @@ Env COLORTERM "truecolor"
 Env XDG_CONFIG_HOME "$work/cfg"
 Env XDG_STATE_HOME "$work/state"
 Hide
-Type "clear && exec ./cassetty -silent -theme $skin Music"
+Type "clear && exec ./cassetty -silent -theme $theme Music"
 Enter
 Sleep 1.5s
 Show
@@ -79,7 +79,7 @@ Sleep 1.2s
 Type "n"
 Sleep 2.5s
 EOF
-	[ "$kind" = site ] && echo "Screenshot out/$skin.png"
+	[ "$kind" = site ] && echo "Screenshot out/$theme.png"
 	cat <<EOF
 Sleep 1s
 Tab
@@ -94,12 +94,12 @@ EOF
 	fi
 }
 
-for skin in "${skins[@]}"; do
-	echo "recording $skin"
-	tape "$skin" site >out/site.tape
+for theme in "${themes[@]}"; do
+	echo "recording $theme"
+	tape "$theme" site >out/site.tape
 	vhs out/site.tape >/dev/null
-	cp "out/$skin.mp4" "$media/"
-	magick "out/$skin.png" -strip -colors 256 "PNG8:$media/$skin.png"
+	cp "out/$theme.mp4" "$media/"
+	magick "out/$theme.png" -strip -colors 256 "PNG8:$media/$theme.png"
 done
 
 if [ "$gif" = 1 ]; then

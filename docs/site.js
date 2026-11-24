@@ -1,18 +1,18 @@
-// Skins, the platform's download key, the latest version and copy buttons.
+// Themes, the platform's download key, the latest version and copy buttons.
 
 const REPO = "samuelb/cassetty";
 // The order `t` cycles through in cassetty, starting at its default.
-const SKINS = ["sunbleached", "silverface", "cyberdeck", "classic", "amber", "vfd", "synthwave"];
+const THEMES = ["sunbleached", "silverface", "cyberdeck", "classic", "amber", "vfd", "synthwave"];
 
 const root = document.documentElement;
 const video = document.getElementById("demo");
-const skinButtons = [...document.querySelectorAll("[data-skin]")];
+const themeButtons = [...document.querySelectorAll("[data-set-theme]")];
 
-function setSkin(name, remember) {
-  if (!SKINS.includes(name)) name = SKINS[0];
+function setTheme(name, remember) {
+  if (!THEMES.includes(name)) name = THEMES[0];
   root.dataset.theme = name;
-  for (const b of skinButtons) b.setAttribute("aria-pressed", String(b.dataset.skin === name));
-  document.getElementById("skin-name").textContent = name;
+  for (const b of themeButtons) b.setAttribute("aria-pressed", String(b.dataset.setTheme === name));
+  document.getElementById("theme-name").textContent = name;
 
   // Swap the recording but stay at the same moment of the demo.
   const src = `media/${name}.mp4`;
@@ -35,12 +35,12 @@ video.addEventListener("loadedmetadata", () => {
   resume = null;
 });
 
-for (const b of skinButtons) b.addEventListener("click", () => setSkin(b.dataset.skin, true));
+for (const b of themeButtons) b.addEventListener("click", () => setTheme(b.dataset.setTheme, true));
 
 addEventListener("keydown", (e) => {
   if (e.key !== "t" || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.target instanceof Element && e.target.closest("input, textarea, [contenteditable]")) return;
-  setSkin(SKINS[(SKINS.indexOf(root.dataset.theme) + 1) % SKINS.length], true);
+  setTheme(THEMES[(THEMES.indexOf(root.dataset.theme) + 1) % THEMES.length], true);
 });
 
 if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -49,7 +49,7 @@ if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
   video.controls = true;
 }
 
-setSkin(root.dataset.theme, false);
+setTheme(root.dataset.theme, false);
 
 // Light up the download key for this machine.
 (async () => {
