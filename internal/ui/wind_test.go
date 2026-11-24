@@ -97,3 +97,28 @@ func TestLettingGoOfAKeyThatWindsStopsTheTape(t *testing.T) {
 		t.Errorf("the tape wound on by %v after the key was let go", got)
 	}
 }
+
+func TestTheArrowKeysWindTheTapeFasterWithShift(t *testing.T) {
+	m := newTestModel(t, toneLibrary(t, 1, 3*time.Minute))
+	press(m, "enter")
+	await(t, "the track to play", func() bool { return m.engine.Position() > 0 })
+
+	// fastest holds the right arrow key down for a moment, and returns the
+	// fastest the tape wound meanwhile.
+	fastest := func(mod tea.KeyMod) float64 {
+		v := 0.0
+		_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight, Mod: mod})
+		for range 20 {
+			time.Sleep(30 * time.Millisecond)
+			_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight, Mod: mod, IsRepeat: true})
+			v = max(v, m.engine.Speed())
+		}
+		_, _ = m.Update(tea.KeyReleaseMsg{Code: tea.KeyRight, Mod: mod})
+		await(t, "the wind to end", func() bool { return !m.engine.Winding() })
+		return v
+	}
+	plain := fastest(0)
+	if fast := fastest(tea.ModShift); fast < 4*plain {
+		t.Errorf("held with shift the tape wound at %v at most, without at %v", fast, plain)
+	}
+}

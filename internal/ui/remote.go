@@ -51,7 +51,7 @@ func (m *Model) handleRemote(c nowplaying.Command) tea.Cmd {
 		m.seekTo(c.Position)
 		return m.kickTick()
 	case nowplaying.SeekBy:
-		return m.seekBy(c.Offset)
+		return m.seekBy(c.Offset, false)
 	case nowplaying.SetVolume:
 		m.setVolume(int(math.Round(c.Volume * 100)))
 	case nowplaying.SetShuffle:

@@ -287,7 +287,15 @@ func (e *Engine) Seek(t time.Duration) error {
 // gets less far, so that a key held down winds the tape for as long as it
 // is held. Position and Speed tell where the head is meanwhile and how fast
 // the tape moves.
-func (e *Engine) Wind(by time.Duration) error {
+func (e *Engine) Wind(by time.Duration) error { return e.wind(by, false) }
+
+// WindFast winds the tape as Wind does, only many times as fast: too fast
+// to be heard, so that the music is heard only while the tape gets up to
+// speed and slows down again. A wind that is under way speeds up to that,
+// or slows down from it to the speed of Wind.
+func (e *Engine) WindFast(by time.Duration) error { return e.wind(by, true) }
+
+func (e *Engine) wind(by time.Duration, fast bool) error {
 	d := e.deck
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -304,7 +312,7 @@ func (e *Engine) Wind(by time.Duration) error {
 		d.tape.reset()
 		d.tape.wind = newWinder(d.src, d.tape.motor, d.playing)
 	}
-	d.tape.wind.aim(by)
+	d.tape.wind.aim(by, fast)
 	d.ended = false
 	d.publish()
 	d.changed()

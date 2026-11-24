@@ -120,7 +120,7 @@ folder.
 | `s` `v` | stop | `enter` `l` | open folder · play track |
 | `<` `>` | previous · next (`z` `b` `n`) | `backspace` `h` `~` | parent folder · root |
 | `←` `→` | rewind · fast forward 5 s | `a` | add to playlist |
-| `shift+←` `shift+→` | the same by 30 s (`[` `]`) | `A` | play, replacing playlist |
+| `shift+←` `shift+→` | the same by 30 s, 8× as fast (`[` `]`) | `A` | play, replacing playlist |
 | `+` `-` | volume | `/` | filter, `esc` clears |
 | `m` | mute | `F` | search the whole library |
 | `e` | eject | `f` | find the playing track |
@@ -143,7 +143,9 @@ playing tape winds it down too.
 `←` and `→` wind the tape the way a deck does: it runs fast forward, or back,
 to where it is to go, and while the deck plays you hear the music race by,
 backwards when it rewinds. A key held down winds the tape for as long as it
-is held. The REW and FF keys of the deck and the mouse wheel over the seek
+is held. With `shift` the tape winds eight times as fast, too fast for the
+head: it comes off the tape, which is heard only getting up to speed and
+slowing down again. The REW and FF keys of the deck and the mouse wheel over the seek
 bar do the same; a click on the seek bar puts the play head there at once.
 
 `u` takes back the last change to the playlist, whichever it was: a track

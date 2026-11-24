@@ -926,8 +926,9 @@ func (m *Model) seekTo(t time.Duration) {
 const windLimit = 2 * time.Minute
 
 // seekBy moves the play head by d the way a deck does: the tape winds fast
-// forward or back, and is heard doing so while it plays.
-func (m *Model) seekBy(d time.Duration) tea.Cmd {
+// forward or back, and is heard doing so while it plays. A fast wind runs
+// faster still, see audio.Engine.WindFast.
+func (m *Model) seekBy(d time.Duration, fast bool) tea.Cmd {
 	if m.src == nil {
 		return nil
 	}
@@ -940,7 +941,11 @@ func (m *Model) seekBy(d time.Duration) tea.Cmd {
 		}
 		return m.kickTick()
 	}
-	if err := m.engine.Wind(d); err != nil {
+	wind := m.engine.Wind
+	if fast {
+		wind = m.engine.WindFast
+	}
+	if err := wind(d); err != nil {
 		m.setFlash("seek: "+err.Error(), true)
 	}
 	return m.kickTick()
@@ -948,12 +953,12 @@ func (m *Model) seekBy(d time.Duration) tea.Cmd {
 
 // windByKey winds the tape by d for a key that is pressed, and takes note of
 // it while it repeats, see letGo.
-func (m *Model) windByKey(msg tea.KeyPressMsg, d time.Duration) tea.Cmd {
+func (m *Model) windByKey(msg tea.KeyPressMsg, d time.Duration, fast bool) tea.Cmd {
 	m.windKey = 0
 	if msg.IsRepeat {
 		m.windKey = msg.Code
 	}
-	return m.seekBy(d)
+	return m.seekBy(d, fast)
 }
 
 // letGo follows a key that is let go: the tape that a key wound while it was
@@ -1505,13 +1510,13 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	case key.Matches(msg, k.Eject):
 		return m.eject()
 	case key.Matches(msg, k.SeekBack):
-		return m.windByKey(msg, -m.opts.SeekStep)
+		return m.windByKey(msg, -m.opts.SeekStep, false)
 	case key.Matches(msg, k.SeekFwd):
-		return m.windByKey(msg, m.opts.SeekStep)
+		return m.windByKey(msg, m.opts.SeekStep, false)
 	case key.Matches(msg, k.SeekBackFar):
-		return m.windByKey(msg, -6*m.opts.SeekStep)
+		return m.windByKey(msg, -6*m.opts.SeekStep, true)
 	case key.Matches(msg, k.SeekFwdFar):
-		return m.windByKey(msg, 6*m.opts.SeekStep)
+		return m.windByKey(msg, 6*m.opts.SeekStep, true)
 	case key.Matches(msg, k.VolUp):
 		m.setVolume(m.volume + 5)
 	case key.Matches(msg, k.VolDown):

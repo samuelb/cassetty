@@ -304,7 +304,7 @@ func (m *Model) pressButton(id string) tea.Cmd {
 	case "btn:prev":
 		return m.prev()
 	case "btn:rew":
-		return m.seekBy(-6 * m.opts.SeekStep)
+		return m.seekBy(-6*m.opts.SeekStep, false)
 	case "btn:play":
 		return m.play()
 	case "btn:pause":
@@ -312,7 +312,7 @@ func (m *Model) pressButton(id string) tea.Cmd {
 	case "btn:stop":
 		return m.stop()
 	case "btn:ff":
-		return m.seekBy(6 * m.opts.SeekStep)
+		return m.seekBy(6*m.opts.SeekStep, false)
 	case "btn:next":
 		return m.next()
 	case "btn:eject":
@@ -427,7 +427,7 @@ func (m *Model) wheel(msg tea.MouseWheelMsg) tea.Cmd {
 	if mo.Y < m.lay.playerH {
 		switch {
 		case inZone("seek", msg):
-			return m.seekBy(time.Duration(-delta) * m.opts.SeekStep)
+			return m.seekBy(time.Duration(-delta)*m.opts.SeekStep, false)
 		default:
 			m.setVolume(m.volume - delta*2)
 		}

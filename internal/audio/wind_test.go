@@ -13,10 +13,10 @@ import (
 // reel is a track whose left channel tells the frame it is: it rises from 0
 // at the first frame to 1 at the last. Its right channel tells which way the
 // tape runs: a sawtooth that rises slowly and falls at once. The reel counts
-// how often it was told to seek.
+// how often it was told to seek, and how many frames it gave.
 type reel struct {
 	frames, pos int
-	seeks       int
+	seeks, read int
 	noSeek      bool // seeking fails
 	panics      bool // seeking panics, as the decoders may on a damaged file
 	rough       int  // frames after a seek that are not those of the track, as from an MP3 decoder
@@ -51,6 +51,7 @@ func (r *reel) Stream(p [][2]float64) (int, bool) {
 		}
 	}
 	r.pos += n
+	r.read += n
 	return n, n > 0
 }
 func (r *reel) Err() error    { return nil }
@@ -357,22 +358,33 @@ func TestAKeyHeldDownWindsNoFurtherThanTheDeckWindsInAMoment(t *testing.T) {
 }
 
 func TestBrakingStopsTheTapeAsSoonAsTheReelsSlowDown(t *testing.T) {
-	e, _ := reelEngine(10*time.Minute, true)
-	e.Seek(5 * time.Minute)
+	e, _ := reelEngine(30*time.Minute, true)
+	e.Seek(15 * time.Minute)
 	e.pull(100 * time.Millisecond)
-	for _, step := range []time.Duration{5 * time.Second, -5 * time.Second} {
+	for _, wind := range []struct {
+		name string
+		by   func(time.Duration) error
+		step time.Duration
+		top  float64
+	}{
+		{"Wind", e.Wind, 5 * time.Second, windSpeed},
+		{"Wind", e.Wind, -5 * time.Second, windSpeed},
+		{"WindFast", e.WindFast, 30 * time.Second, windFast},
+		{"WindFast", e.WindFast, -30 * time.Second, windFast},
+	} {
+		step, accel := wind.step, windAccel*wind.top/windSpeed
 		for range 30 { // a second of a key that repeats
-			e.Wind(step)
+			wind.by(step)
 			e.pull(30 * time.Millisecond)
 		}
 		from, v := e.Position(), math.Abs(e.Speed())
-		if v < windSpeed {
-			t.Fatalf("the tape winds at %v while the key is held", e.Speed())
+		if v < wind.top {
+			t.Fatalf("%s by %v: the tape winds at %v while the key is held", wind.name, step, e.Speed())
 		}
 		e.Brake()
 		out, _, _ := e.wound(t)
-		if coast, most := SampleRate.D(len(out)), time.Duration(v/windAccel*float64(time.Second)); coast > most+20*time.Millisecond {
-			t.Errorf("winding by %v, the tape wound on for %v after the key was let go, want %v", step, coast, most)
+		if coast, most := SampleRate.D(len(out)), time.Duration(v/accel*float64(time.Second)); coast > most+20*time.Millisecond {
+			t.Errorf("%s by %v: the tape wound on for %v after the key was let go, want %v", wind.name, step, coast, most)
 		}
 		// From the speed of winding to that of playing on forward, and to
 		// standing still before it plays on in reverse.
@@ -380,15 +392,112 @@ func TestBrakingStopsTheTapeAsSoonAsTheReelsSlowDown(t *testing.T) {
 		if step < 0 {
 			on = 0
 		}
-		want := time.Duration((v*v - on*on) / (2 * windAccel) * float64(time.Second))
+		want := time.Duration((v*v - on*on) / (2 * accel) * float64(time.Second))
 		if step < 0 {
 			want = -want
 		}
 		if got := e.Position() - from; !near(got, want, 50*time.Millisecond) {
-			t.Errorf("winding by %v, the head went on by %v after the key was let go, want %v", step, got, want)
+			t.Errorf("%s by %v: the head went on by %v after the key was let go, want %v", wind.name, step, got, want)
 		}
 		if e.Speed() != 1 {
-			t.Errorf("speed %v after braking", e.Speed())
+			t.Errorf("%s by %v: speed %v after braking", wind.name, step, e.Speed())
+		}
+	}
+}
+
+func TestAFastWindGetsUpToSpeedAsSoonAsAPlainOne(t *testing.T) {
+	e, _ := reelEngine(10*time.Minute, true)
+	upToSpeed := func(by func(time.Duration) error, top float64) time.Duration {
+		t.Helper()
+		var took time.Duration
+		for ; e.Speed() < top; took += 10 * time.Millisecond {
+			if took > time.Second {
+				t.Fatalf("the tape winds at %v after %v, want %v", e.Speed(), took, top)
+			}
+			by(30 * time.Second)
+			e.pull(10 * time.Millisecond)
+		}
+		return took
+	}
+	e.pull(100 * time.Millisecond)
+	plain := upToSpeed(e.Wind, windSpeed)
+	e.Seek(0)
+	e.pull(100 * time.Millisecond)
+	if fast := upToSpeed(e.WindFast, windFast); !near(fast, plain, 20*time.Millisecond) {
+		t.Errorf("a fast wind got up to speed in %v, a plain one in %v", fast, plain)
+	}
+
+	// Let go of shift, and the key goes on to repeat as a plain one: the
+	// tape slows down to the plain speed as fast as it got up to its own,
+	// although the plain wind asks for less than it takes to slow down.
+	accel := windAccel * windFast / windSpeed
+	var took time.Duration
+	for v := e.Speed(); v > windSpeed; took += 10 * time.Millisecond {
+		if took > time.Second {
+			t.Fatalf("the tape winds at %v after %v of a plain wind", v, took)
+		}
+		e.Wind(5 * time.Second)
+		e.pull(10 * time.Millisecond)
+		if dv, most := v-e.Speed(), accel*0.01; dv > most+1e-9 || dv < -1e-9 {
+			t.Fatalf("the speed of the tape went from %v to %v in 10 ms", v, e.Speed())
+		}
+		v = e.Speed()
+	}
+	if most := time.Duration((windFast - windSpeed) / accel * float64(time.Second)); took > most+10*time.Millisecond {
+		t.Errorf("the tape took %v to slow down to the plain speed, want %v", took, most)
+	}
+}
+
+func TestAFastWindTakesTheTapeOffTheHead(t *testing.T) {
+	for _, by := range []time.Duration{5 * time.Minute, -5 * time.Minute} {
+		e, r := reelEngine(30*time.Minute, true)
+		e.Seek(15 * time.Minute)
+		r.rough = 1500
+		e.pull(time.Second)
+		from, read := e.Position(), r.read
+		if err := e.WindFast(by); err != nil {
+			t.Fatal(err)
+		}
+		out, fastest, slowest := e.wound(t)
+
+		if v := max(fastest, -slowest); v != windFast {
+			t.Errorf("winding by %v, the tape wound at %v at most", by, v)
+		}
+		want := from + by
+		if got := e.Position(); !near(got, want, 20*time.Millisecond) {
+			t.Errorf("winding by %v, the head is at %v, want %v", by, got, want)
+		}
+		// Off the head the tape is silent and the decoder is not read: the
+		// music is heard only as the tape gets up to speed and slows down,
+		// and then it is the music of the track.
+		silent := 0
+		for i, f := range out {
+			if f == [2]float64{} {
+				silent++
+			}
+			if math.Abs(f[0]) > 1 || math.Abs(f[1]) > 1 {
+				t.Fatalf("winding by %v, frame %d is %v, which is not of the track", by, i, f)
+			}
+		}
+		if share := float64(silent) / float64(len(out)); share < 0.5 {
+			t.Errorf("winding by %v, %.0f%% of the wind is silent", by, share*100)
+		}
+		edge := SampleRate.N(20 * time.Millisecond)
+		if rms(out[:edge]) == 0 || rms(out[len(out)-edge:]) == 0 {
+			t.Errorf("winding by %v, the tape is not heard getting up to speed or slowing down", by)
+		}
+		if got := SampleRate.D(r.read - read); got > 20*time.Second {
+			t.Errorf("winding by %v, the decoder was read for %v of the track", by, got)
+		}
+		after := e.pull(100 * time.Millisecond)
+		at := int(math.Round(after[0][0] * float64(r.frames)))
+		if got := SampleRate.D(at); !near(got, want, 20*time.Millisecond) {
+			t.Errorf("winding by %v, the tape plays on from %v, want %v", by, got, want)
+		}
+		for i, f := range after {
+			if f != r.frame(at+i) {
+				t.Fatalf("winding by %v, frame %d after the wind is %v, want %v", by, i, f, r.frame(at+i))
+			}
 		}
 	}
 }
