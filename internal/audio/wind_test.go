@@ -538,22 +538,6 @@ func TestSeekingBreaksOffAWind(t *testing.T) {
 	}
 }
 
-func TestWindingHasTheSoundOfTheTape(t *testing.T) {
-	e, _ := reelEngine(60*time.Second, true)
-	e.SetTape(true)
-	e.pull(time.Second)
-	from := e.Position()
-	e.Wind(5 * time.Second)
-	e.wound(t)
-	if e.Speed() != 1 {
-		t.Errorf("speed %v after the wind", e.Speed())
-	}
-	e.pull(100 * time.Millisecond)
-	if got := e.Position(); !near(got, from+5100*time.Millisecond, 30*time.Millisecond) {
-		t.Errorf("the head is at %v", got)
-	}
-}
-
 func TestWindingAResampledTrack(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tone.wav")
 	writeWAV(t, path, 48000, 20*time.Second)

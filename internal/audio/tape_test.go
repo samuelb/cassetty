@@ -40,8 +40,6 @@ func rms(frames [][2]float64) float64 {
 	return math.Sqrt(sum / float64(2*len(frames)))
 }
 
-func dB(v float64) float64 { return 20 * math.Log10(v) }
-
 func TestTapeFor(t *testing.T) {
 	for codec, want := range map[string]Tape{
 		"FLAC": TapeMetal, "WAV": TapeMetal, "ALAC": TapeMetal, "PCM_S16BE": TapeMetal,
@@ -54,7 +52,7 @@ func TestTapeFor(t *testing.T) {
 	}
 }
 
-func TestTransportPassesAudioThroughWithoutTapeSound(t *testing.T) {
+func TestTransportPassesAudioThrough(t *testing.T) {
 	tr := newTransport()
 	tr.motor = 1
 	src := &sine{amp: 0.5}
@@ -69,73 +67,10 @@ func TestTransportPassesAudioThroughWithoutTapeSound(t *testing.T) {
 	}
 }
 
-func TestTapeSoundHisses(t *testing.T) {
-	var levels []float64
-	for _, tape := range []Tape{TapeNormal, TapeChrome, TapeMetal} {
-		tr := newTransport()
-		tr.load(tape)
-		tr.setOn(true)
-		tr.motor = 1
-		silence := &sine{}
-		tr.run(silence, 300*time.Millisecond, true) // fade in
-		level := dB(rms(tr.run(silence, time.Second, true)))
-		t.Logf("%v hisses at %.1f dBFS", tape, level)
-		if level < -76 || level > -58 {
-			t.Errorf("%v hisses at %.1f dBFS", tape, level)
-		}
-		levels = append(levels, level)
-	}
-	if !(levels[0] > levels[1]+2 && levels[1] > levels[2]+2) {
-		t.Errorf("better tape should hiss less: %v", levels)
-	}
-}
-
-func TestTapeSoundFadesOut(t *testing.T) {
-	tr := newTransport()
-	tr.setOn(true)
-	tr.motor = 1
-	src := &sine{amp: 0.5}
-	tr.run(src, 300*time.Millisecond, true)
-	tr.setOn(false)
-	tr.run(src, 200*time.Millisecond, true)
-	if tr.mix != 0 {
-		t.Fatalf("tape sound still mixed in at %v", tr.mix)
-	}
-	// Once faded out, the read position glides back onto the frames, which
-	// then pass through unchanged.
-	tr.run(src, 100*time.Millisecond, true)
-	if tr.pos != math.Trunc(tr.pos) {
-		t.Fatalf("read position %v is between two frames", tr.pos)
-	}
-	at := src.read - (tr.n - int(tr.pos)) // the next frame to come out
-	out := tr.run(src, 100*time.Millisecond, true)
-	want := make([][2]float64, len(out))
-	(&sine{amp: 0.5, read: at}).pull(want)
-	for i := range out {
-		if out[i] != want[i] {
-			t.Fatalf("frame %d is %v, want %v", i, out[i], want[i])
-		}
-	}
-}
-
-func TestTapeKeepsTime(t *testing.T) {
-	tr := newTransport()
-	tr.setOn(true)
-	tr.motor = 1
-	src := &sine{amp: 0.5}
-	out := tr.run(src, 5*time.Second, true)
-	dev := float64(src.read-len(out)) / float64(len(out))
-	if dev == 0 || math.Abs(dev) > wowDepth+flutterDepth+driftDepth {
-		t.Errorf("the tape ran %+.3f%% off speed", 100*dev)
-	}
-}
-
 func TestTapeWindsDownAndUp(t *testing.T) {
 	tr := newTransport()
-	tr.setOn(true)
 	tr.motor = 1
 	src := &sine{amp: 0.5}
-	tr.run(src, 300*time.Millisecond, true)
 	full := rms(tr.run(src, 100*time.Millisecond, true))
 
 	// Pausing winds the tape down: it slows to a stop over tapeStop,
@@ -215,18 +150,13 @@ func TestEngineWindsTapeDownBeforeSuspending(t *testing.T) {
 
 // BenchmarkTransport measures one second of audio through the transport.
 func BenchmarkTransport(b *testing.B) {
-	for _, on := range []bool{false, true} {
-		b.Run(map[bool]string{false: "off", true: "on"}[on], func(b *testing.B) {
-			tr := newTransport()
-			tr.setOn(on)
-			tr.motor = 1
-			src := &sine{amp: 0.5}
-			buf := make([][2]float64, 441)
-			for b.Loop() {
-				for range 100 {
-					tr.process(buf, true, src.pull)
-				}
-			}
-		})
+	tr := newTransport()
+	tr.motor = 1
+	src := &sine{amp: 0.5}
+	buf := make([][2]float64, 441)
+	for b.Loop() {
+		for range 100 {
+			tr.process(buf, true, src.pull)
+		}
 	}
 }

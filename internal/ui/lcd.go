@@ -203,9 +203,8 @@ func (m *Model) lcdInfo(w int) [2]string {
 	return [2]string{first, khz + " kHz · " + ch}
 }
 
-// lcdFlags draws the clickable SHUF, TAPE and REP indicators. TAPE comes
-// before REP, whose label changes width, and is left out on the narrowest
-// displays.
+// lcdFlags draws the clickable SHUF and REP indicators, abbreviated on
+// narrow displays.
 func (m *Model) lcdFlags(lb *lineBuf, w int) {
 	t := m.theme
 	on := fgbg(t.LCDFg, t.LCDBg).Bold(true)
@@ -216,24 +215,17 @@ func (m *Model) lcdFlags(lb *lineBuf, w int) {
 		}
 		return off
 	}
-	shuf, tape := "SHUF", "TAPE"
+	shuf := "SHUF"
 	rep := map[repeatMode]string{repeatOff: "REP", repeatAll: "REP·ALL", repeatOne: "REP·ONE"}[m.repeat]
-	if w < len([]rune("SHUF TAPE REP·ALL")) {
-		shuf, tape = "SH", "TP"
+	if w < len([]rune("SHUF REP·ALL")) {
+		shuf = "SH"
 		rep = map[repeatMode]string{repeatOff: "RP", repeatAll: "RP·A", repeatOne: "RP·1"}[m.repeat]
-		if w < len([]rune("SH TP RP·A")) {
-			tape = ""
-		}
 	}
 	if w < len(shuf)+1+len([]rune(rep)) {
 		return
 	}
 	lb.raw(zone.Mark("shuffle", st(m.shuffle).Render(shuf)), len(shuf))
 	lb.add(off, " ")
-	if tape != "" {
-		lb.raw(zone.Mark("tape", st(m.tape).Render(tape)), len(tape))
-		lb.add(off, " ")
-	}
 	lb.raw(zone.Mark("repeat", st(m.repeat != repeatOff).Render(rep)), len([]rune(rep)))
 }
 

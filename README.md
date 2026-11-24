@@ -130,15 +130,17 @@ folder.
 | `tab` `1` `2` | library · playlist | `S` | shuffle |
 | `enter` | play selected | `r` | repeat off · all · one |
 | `d` `x` | remove | `i` | elapsed · remaining |
-| `c` | clear all | `T` | tape sound |
-| `K` `J` | move up / down | `t` | next theme |
-| `u` | undo the last change | `?` | all keys |
-| | | `q` | quit |
+| `c` | clear all | `t` | next theme |
+| `K` `J` | move up / down | `?` | all keys |
+| `u` | undo the last change | `q` | quit |
 
 Playing, pausing and stopping sound the way they do on a deck: the tape takes
 a quarter of a second to get up to speed and as long to wind down to a stop,
 so the music speeds up from a standstill and slows down to one. Ejecting a
-playing tape winds it down too.
+playing tape winds it down too. Once the tape is up to speed the decoded
+audio plays unchanged. The label names the tape type after the file:
+lossless files play from metal tape (type IV), MP3, Ogg and Opus from chrome
+(type II) and everything else from normal tape (type I).
 
 `←` and `→` wind the tape the way a deck does: it runs fast forward, or back,
 to where it is to go, and while the deck plays you hear the music race by,
@@ -171,16 +173,6 @@ On Linux cassetty is an [MPRIS](https://specifications.freedesktop.org/mpris-spe
 player: the media keys, the media widgets of GNOME, KDE Plasma and other
 desktops, and `playerctl` show the playing track, seek in it, and set the
 volume, shuffle and repeat.
-
-## Tape sound
-
-Press `T` to hear the music come off a cassette: the tape wows and flutters,
-hisses quietly, saturates a little and loses some treble. How much depends on
-the tape type printed on the label, which follows the file: lossless files
-play from metal tape (type IV), MP3, Ogg and Opus from chrome (type II) and
-everything else from normal tape (type I), which hisses the most. cassetty
-remembers the setting; with it off, the decoded audio plays unchanged once
-the tape is up to speed.
 
 ## Themes
 
@@ -224,7 +216,7 @@ seek_step = 5              # seconds for ←/→ (shift = 6x)
 cassetty picks up where you left off: it remembers the playlist, the track
 in the deck and how far into it you were, and the next start loads that
 track paused at that point, so `space` plays on. It also remembers the
-volume, theme, shuffle, repeat, tape sound and the last folder. The playlist,
+volume, theme, shuffle, repeat and the last folder. The playlist,
 the track and the last folder are remembered for each music folder by
 itself, so a start on another folder leaves those of your library alone.
 That state lives in `~/.local/state/cassetty/state.json` (or

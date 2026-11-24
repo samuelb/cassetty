@@ -21,7 +21,7 @@ var saveDelay = 2 * time.Second
 // message.
 type stateMark struct {
 	volume, theme int
-	shuffle, tape bool
+	shuffle       bool
 	repeat        repeatMode
 	dir           string
 	edits         int // changes to the playlist
@@ -33,7 +33,7 @@ type stateMark struct {
 func (m *Model) mark() stateMark {
 	return stateMark{
 		volume: m.volume, theme: m.themeIdx,
-		shuffle: m.shuffle, tape: m.tape, repeat: m.repeat,
+		shuffle: m.shuffle, repeat: m.repeat,
 		dir:    m.dir,
 		edits:  m.edits,
 		cur:    m.cur,

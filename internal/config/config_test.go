@@ -113,7 +113,7 @@ func TestStateFromBeforeLibrariesHadSessions(t *testing.T) {
 		Playlist: []string{"/music/a/1.mp3", "/music/a/2.mp3"}, Track: "/music/a/2.mp3", Index: 1, Position: 7.5,
 	}}
 	got := LoadState("/music")
-	if got.Volume == nil || *got.Volume != 55 || got.Theme != "amber" || !got.Tape || !reflect.DeepEqual(got.Session, want) {
+	if got.Volume == nil || *got.Volume != 55 || got.Theme != "amber" || !reflect.DeepEqual(got.Session, want) {
 		t.Fatalf("LoadState = %+v", got)
 	}
 

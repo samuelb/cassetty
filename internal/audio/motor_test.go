@@ -12,7 +12,6 @@ var (
 )
 
 func TestTheTapeGetsUpToSpeedAndWindsDown(t *testing.T) {
-	// The tape sound is off: the motor eases all the same.
 	e, _ := reelEngine(60*time.Second, false)
 	e.SetPlaying(true)
 	up := e.pull(startTime)

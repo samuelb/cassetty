@@ -70,7 +70,6 @@ type Options struct {
 	NerdFont        bool // draw the browser icons from a Nerd Font
 	Shuffle         bool
 	Repeat          string
-	Tape            bool // start with the tape sound on
 	PaintBackground bool
 	SeekStep        time.Duration
 	Formats         library.Formats
@@ -119,7 +118,6 @@ type Model struct {
 	// opened, see followDeck
 	held      *audio.Event
 	remaining bool
-	tape      bool // the tape sound is on
 
 	// the track opened ahead to follow cur without a gap
 	queue    queued
@@ -212,7 +210,6 @@ func New(opts Options) *Model {
 		curHint:  -1,
 		volume:   opts.Volume,
 		shuffle:  opts.Shuffle,
-		tape:     opts.Tape,
 		spectrum: viz.NewSpectrum(),
 		frames:   make([][2]float64, viz.FrameSize),
 		root:     filepath.Clean(opts.Root),
@@ -237,7 +234,6 @@ func New(opts Options) *Model {
 		m.resuming = nil // that track plays instead
 	}
 	m.engine.SetVolume(float64(m.volume) / 100)
-	m.engine.SetTape(m.tape)
 	if opts.Notice != "" {
 		m.setFlash(opts.Notice, true)
 	}
@@ -262,7 +258,6 @@ func (m *Model) State() config.State {
 		Theme:   m.theme.Name,
 		Shuffle: m.shuffle,
 		Repeat:  repeatNames[m.repeat],
-		Tape:    m.tape,
 
 		Session: config.Session{LastDir: m.dir, Playback: m.playback()},
 	}
@@ -1207,12 +1202,6 @@ func (m *Model) setRepeat(r repeatMode) {
 	m.setFlash("repeat "+repeatNames[r], false)
 }
 
-func (m *Model) toggleTape() {
-	m.tape = !m.tape
-	m.engine.SetTape(m.tape)
-	m.setFlash("tape sound "+onOff(m.tape), false)
-}
-
 func (m *Model) toggleMute() {
 	m.muted = !m.muted
 	if m.muted {
@@ -1530,8 +1519,6 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.setFlash("theme: "+m.theme.Name, false)
 	case key.Matches(msg, k.Remaining):
 		m.remaining = !m.remaining
-	case key.Matches(msg, k.Tape):
-		m.toggleTape()
 	case key.Matches(msg, k.Undo):
 		return m.undo()
 	case key.Matches(msg, k.Search):

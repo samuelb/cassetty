@@ -156,9 +156,6 @@ func (e *Engine) Start(src *Source, play bool) uint64 {
 	d.playing = play
 	d.ended = false
 	d.tape.reset()
-	if src != nil {
-		d.tape.load(src.Tape())
-	}
 	d.publish()
 	d.mu.Unlock()
 	d.changed()
@@ -225,15 +222,6 @@ func (e *Engine) SetPlaying(play bool) {
 	e.deck.publish()
 	e.deck.mu.Unlock()
 	e.deck.changed()
-}
-
-// SetTape turns the tape sound on or off: wow and flutter, hiss, saturation
-// and a softer treble, after the tape type of the track.
-func (e *Engine) SetTape(on bool) {
-	d := e.deck
-	d.mu.Lock()
-	d.tape.setOn(on)
-	d.mu.Unlock()
 }
 
 // Speed returns how fast the tape moves: 0 when it stands still, 1 when it
@@ -648,7 +636,6 @@ func (d *deck) fill(samples [][2]float64) int {
 			old := d.src
 			d.src, d.stream, d.gen = d.next, d.nextStream, d.nextGen
 			d.next, d.nextStream, d.nextGen = nil, nil, 0
-			d.tape.load(d.src.Tape())
 			ev.Next = d.gen
 			go old.Close() // not on the audio thread
 		} else {
