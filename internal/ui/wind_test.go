@@ -59,7 +59,9 @@ func TestTheArrowKeysWindTheTape(t *testing.T) {
 	_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	await(t, "the paused deck to wind", func() bool { return m.engine.Speed() > 5 })
 	await(t, "the wind to end", func() bool { return !m.engine.Winding() })
-	if got := m.engine.Position() - from; got < 4990*time.Millisecond || got > 5010*time.Millisecond {
+	// The head the engine tells of was ahead of the frame that played, by
+	// what the transport had read ahead, before it paused.
+	if got := m.engine.Position() - from; got < 4985*time.Millisecond || got > 5015*time.Millisecond {
 		t.Errorf("the paused deck wound by %v", got)
 	}
 	if m.state != statePaused || m.engine.Speed() != 0 {

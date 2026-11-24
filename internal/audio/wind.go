@@ -11,12 +11,12 @@ import (
 // racing by, high and garbled ("cue and review"). The reels take a moment to
 // get up to speed and to slow down again, which is heard as well.
 const (
-	windSpeed   = 32.0 // the fastest the tape winds, in multiples of the playing speed
-	windAccel   = 60.0 // how fast the reels gain and lose speed, in such multiples per second
-	windSlowest = 4.0  // the tape winds at least this fast, whatever the decoder takes
-	windLoad    = 0.5  // the share of the time that decoding may take while winding
-	windMute    = 0.4  // the head puts out less the faster the tape winds: by speed^-windMute
-	cueFade     = 0.05 // seconds in which the head comes on or off the tape
+	windSpeed   = 32.0  // the fastest the tape winds, in multiples of the playing speed
+	windAccel   = 100.0 // how fast the reels gain and lose speed, in such multiples per second
+	windSlowest = 4.0   // the tape winds at least this fast, whatever the decoder takes
+	windLoad    = 0.5   // the share of the time that decoding may take while winding
+	windMute    = 0.4   // the head puts out less the faster the tape winds: by speed^-windMute
+	cueFade     = 0.05  // seconds in which the head comes on or off the tape
 
 	// windReach is how far the head may be asked to go, in seconds of the
 	// track. A key that is held asks for more with every repeat, and the
