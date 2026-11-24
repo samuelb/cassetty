@@ -10,20 +10,22 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: website
   cancel-in-progress: true
 
+# Build and deploy are separate jobs on purpose:
+# - "Re-run failed jobs" then only re-runs the deploy, which reuses the one
+#   artifact from the build. Re-running a single job that also uploads leaves
+#   two "github-pages" artifacts in the run, and deploy-pages refuses those.
+# - deploy-pages looks the artifact up exactly once, with no retry, and the
+#   artifact list can lag behind a finished upload by a few seconds. A job
+#   boundary plus the retries below absorb that lag.
 jobs:
-  deploy:
-    name: Deploy to GitHub Pages
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -31,5 +33,32 @@ jobs:
         with:
           path: docs
 
-      - id: deployment
-        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy-1.outputs.page_url || steps.deploy-2.outputs.page_url || steps.deploy-3.outputs.page_url }}
+    steps:
+      - id: deploy-1
+        continue-on-error: true
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      - if: steps.deploy-1.outcome == 'failure'
+        run: sleep 15
+
+      - id: deploy-2
+        if: steps.deploy-1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      - if: steps.deploy-2.outcome == 'failure'
+        run: sleep 45
+
+      - id: deploy-3
+        if: steps.deploy-2.outcome == 'failure'
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
