@@ -311,6 +311,18 @@ func (e *Engine) Wind(by time.Duration) error {
 	return nil
 }
 
+// Brake has the tape that winds slow down at once, as when the key that
+// winds it is let go: the head goes on only as far as the reels take to
+// slow down, or less where Wind asked for less.
+func (e *Engine) Brake() {
+	d := e.deck
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.tape.wind != nil {
+		d.tape.wind.brake(d.playing)
+	}
+}
+
 // Winding reports whether the tape is being wound, see Wind: from when it is
 // asked to until the head is where it was to go.
 func (e *Engine) Winding() bool { return e.deck.winds.Load() }

@@ -68,3 +68,32 @@ func TestTheArrowKeysWindTheTape(t *testing.T) {
 		t.Errorf("state %v at a speed of %v after winding a paused deck", m.state, m.engine.Speed())
 	}
 }
+
+func TestLettingGoOfAKeyThatWindsStopsTheTape(t *testing.T) {
+	m := newTestModel(t, toneLibrary(t, 1, 60*time.Second))
+	press(m, "enter")
+	await(t, "the track to play", func() bool { return m.engine.Position() > 0 })
+
+	// A tap winds the tape by the step in full, however soon it is let go.
+	from := m.engine.Position()
+	_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	_, _ = m.Update(tea.KeyReleaseMsg{Code: tea.KeyRight})
+	await(t, "the wind to end", func() bool { return !m.engine.Winding() })
+	if got := m.engine.Position() - from; got < 5*time.Second {
+		t.Errorf("a tap wound the tape by %v", got)
+	}
+
+	// A key held down repeats; once it is let go the tape goes on only as
+	// far as the reels take to slow down, not as far as the repeats asked.
+	_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	for range 20 {
+		time.Sleep(30 * time.Millisecond)
+		_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyRight, IsRepeat: true})
+	}
+	at := m.engine.Position()
+	_, _ = m.Update(tea.KeyReleaseMsg{Code: tea.KeyRight})
+	await(t, "the wind to end", func() bool { return !m.engine.Winding() })
+	if got := m.engine.Position() - at; got > 8*time.Second {
+		t.Errorf("the tape wound on by %v after the key was let go", got)
+	}
+}

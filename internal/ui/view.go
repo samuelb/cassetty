@@ -60,6 +60,7 @@ func (m *Model) View() tea.View {
 	var v tea.View
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeAllMotion
+	v.KeyboardEnhancements.ReportEventTypes = true // for the tape to stop when a key is let go, see letGo
 	v.WindowTitle = "cassetty"
 	if m.src != nil {
 		v.WindowTitle = map[playState]string{statePlaying: "▶ ", statePaused: "▮▮ ", stateStopped: "■ "}[m.state] +

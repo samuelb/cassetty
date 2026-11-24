@@ -356,6 +356,43 @@ func TestAKeyHeldDownWindsNoFurtherThanTheDeckWindsInAMoment(t *testing.T) {
 	}
 }
 
+func TestBrakingStopsTheTapeAsSoonAsTheReelsSlowDown(t *testing.T) {
+	e, _ := reelEngine(10*time.Minute, true)
+	e.Seek(5 * time.Minute)
+	e.pull(100 * time.Millisecond)
+	for _, step := range []time.Duration{5 * time.Second, -5 * time.Second} {
+		for range 30 { // a second of a key that repeats
+			e.Wind(step)
+			e.pull(30 * time.Millisecond)
+		}
+		from, v := e.Position(), math.Abs(e.Speed())
+		if v < windSpeed {
+			t.Fatalf("the tape winds at %v while the key is held", e.Speed())
+		}
+		e.Brake()
+		out, _, _ := e.wound(t)
+		if coast, most := SampleRate.D(len(out)), time.Duration(v/windAccel*float64(time.Second)); coast > most+20*time.Millisecond {
+			t.Errorf("winding by %v, the tape wound on for %v after the key was let go, want %v", step, coast, most)
+		}
+		// From the speed of winding to that of playing on forward, and to
+		// standing still before it plays on in reverse.
+		on := 1.0
+		if step < 0 {
+			on = 0
+		}
+		want := time.Duration((v*v - on*on) / (2 * windAccel) * float64(time.Second))
+		if step < 0 {
+			want = -want
+		}
+		if got := e.Position() - from; !near(got, want, 50*time.Millisecond) {
+			t.Errorf("winding by %v, the head went on by %v after the key was let go, want %v", step, got, want)
+		}
+		if e.Speed() != 1 {
+			t.Errorf("speed %v after braking", e.Speed())
+		}
+	}
+}
+
 func TestWindingTurnsAround(t *testing.T) {
 	e, _ := reelEngine(60*time.Second, true)
 	e.Seek(30 * time.Second)

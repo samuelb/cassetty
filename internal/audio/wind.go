@@ -20,7 +20,8 @@ const (
 
 	// windReach is how far the head may be asked to go, in seconds of the
 	// track. A key that is held asks for more with every repeat, and the
-	// tape should stop soon after it is released.
+	// tape should stop soon after it is released, also where the terminal
+	// does not tell of that for Engine.Brake.
 	windReach = 30.0
 	// windLead is how long before the decoder is read that it is moved,
 	// see winder.prepare.
@@ -111,6 +112,27 @@ func (w *winder) aim(d time.Duration) {
 	}
 	w.target = max(0, t)
 	w.arrived = false
+}
+
+// brake moves the target in to where the tape gets to while it slows down
+// from the speed it has, to the speed it goes on at from there as in next,
+// unless it is to stop before that anyway.
+func (w *winder) brake(playing bool) {
+	left := w.target - w.pos
+	if w.arrived || w.speed*left <= 0 {
+		return // it stops already, or still turns around towards the target
+	}
+	dir, on := -1.0, 0.0
+	if left > 0 {
+		dir = 1
+		if playing {
+			on = 1
+		}
+	}
+	reach := max(0, w.speed*w.speed-on*on) / (2 * windAccel) * w.rate * float64(SampleRate)
+	if reach < math.Abs(left) {
+		w.target = w.pos + dir*reach
+	}
 }
 
 // top returns the fastest the tape may wind for now: slower than windSpeed

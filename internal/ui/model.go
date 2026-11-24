@@ -184,6 +184,9 @@ type Model struct {
 	tab        tab
 	showHelp   bool
 	helpOffset int
+	// windKey is the key that winds the tape and repeats, as it does while
+	// it is held down; 0 when no such key is, see letGo
+	windKey rune
 
 	// mouse
 	hover        string
@@ -625,6 +628,10 @@ func (m *Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m, m.handleKey(msg)
 
+	case tea.KeyReleaseMsg:
+		m.letGo(msg)
+		return m, nil
+
 	case tea.MouseMsg:
 		return m, m.handleMouse(msg)
 	}
@@ -937,6 +944,27 @@ func (m *Model) seekBy(d time.Duration) tea.Cmd {
 		m.setFlash("seek: "+err.Error(), true)
 	}
 	return m.kickTick()
+}
+
+// windByKey winds the tape by d for a key that is pressed, and takes note of
+// it while it repeats, see letGo.
+func (m *Model) windByKey(msg tea.KeyPressMsg, d time.Duration) tea.Cmd {
+	m.windKey = 0
+	if msg.IsRepeat {
+		m.windKey = msg.Code
+	}
+	return m.seekBy(d)
+}
+
+// letGo follows a key that is let go: the tape that a key wound while it was
+// held down slows down at once, as a tap winds it by the step in full. Only
+// a terminal that reports key releases tells of it, see View; elsewhere the
+// tape winds on for a moment, as far as audio.Engine.Wind lets it get ahead.
+func (m *Model) letGo(msg tea.KeyReleaseMsg) {
+	if m.windKey != 0 && msg.Code == m.windKey {
+		m.windKey = 0
+		m.engine.Brake()
+	}
 }
 
 // winding tells which way the tape is wound: 1 fast forward, -1 back, and 0
@@ -1477,13 +1505,13 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	case key.Matches(msg, k.Eject):
 		return m.eject()
 	case key.Matches(msg, k.SeekBack):
-		return m.seekBy(-m.opts.SeekStep)
+		return m.windByKey(msg, -m.opts.SeekStep)
 	case key.Matches(msg, k.SeekFwd):
-		return m.seekBy(m.opts.SeekStep)
+		return m.windByKey(msg, m.opts.SeekStep)
 	case key.Matches(msg, k.SeekBackFar):
-		return m.seekBy(-6 * m.opts.SeekStep)
+		return m.windByKey(msg, -6*m.opts.SeekStep)
 	case key.Matches(msg, k.SeekFwdFar):
-		return m.seekBy(6 * m.opts.SeekStep)
+		return m.windByKey(msg, 6*m.opts.SeekStep)
 	case key.Matches(msg, k.VolUp):
 		m.setVolume(m.volume + 5)
 	case key.Matches(msg, k.VolDown):
