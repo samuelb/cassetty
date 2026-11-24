@@ -15,14 +15,17 @@ type transportButton struct {
 	id, icon, label string
 }
 
+// The bars are plain pipes: many fonts (JetBrains Mono among them) lack ▮, and
+// the fallback font's ▮ drops into the descender below the triangles, whereas
+// every font centres | on the same line as ◀ and ▶.
 var transport = []transportButton{
-	{"btn:prev", "▮◀", "PREV"},
+	{"btn:prev", "|◀", "PREV"},
 	{"btn:rew", "◀◀", "REW"},
 	{"btn:play", "▶", "PLAY"},
-	{"btn:pause", "▮▮", "PAUSE"},
+	{"btn:pause", "||", "PAUSE"},
 	{"btn:stop", "■", "STOP"},
 	{"btn:ff", "▶▶", "FF"},
-	{"btn:next", "▶▮", "NEXT"},
+	{"btn:next", "▶|", "NEXT"},
 	{"btn:eject", "▲", "EJECT"},
 }
 
