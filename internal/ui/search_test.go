@@ -107,8 +107,11 @@ func TestSearchTheWholeLibrary(t *testing.T) {
 	if m.search.on || m.filter != "" || m.filtering {
 		t.Fatalf("esc should end the search: on %v, filter %q", m.search.on, m.filter)
 	}
-	if e, _ := m.selectedEntry(); e.Name != "Kind of Blue" {
-		t.Fatalf("back on %q, want the entry selected before", e.Name)
+	// The search started from a filter that left nothing to select, so the
+	// folder is back at the top.
+	if !m.onParent() {
+		e, _ := m.selectedEntry()
+		t.Fatalf("back on %q, want the way up", e.Name)
 	}
 
 	// Opening a folder ends the search there. A folder matches with what

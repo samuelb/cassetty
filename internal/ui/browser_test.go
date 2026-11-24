@@ -26,27 +26,27 @@ func TestParentFolderEntry(t *testing.T) {
 		t.Errorf("the root shows the way up:\n%s", f)
 	}
 
-	// A folder below lists it first, with the cursor on the first entry.
+	// A folder below lists it first, with the cursor on it. On it nothing is
+	// selected to add or play, and enter goes up.
 	press(m, "enter")
 	if got := names(m); !slices.Equal(got, []string{"..", "Album", "Empty"}) {
 		t.Fatalf("Artist lists %q", got)
 	}
-	if e, ok := m.selectedEntry(); !ok || e.Name != "Album" {
-		t.Fatalf("entering selects %q", e.Name)
+	if _, ok := m.selectedEntry(); ok || !m.onParent() {
+		t.Fatal("entering should put the cursor on the way up, which selects no entry")
 	}
 	f := checkFrame(t, m, 100, 30)
-	if !strings.Contains(f, "◂ .. ") || !strings.Contains(f, " 1/2 ") {
-		t.Errorf("the way up or the count of entries does not show:\n%s", f)
+	if !strings.Contains(f, "◂ .. ") || !strings.Contains(f, " –/2 ") {
+		t.Errorf("the way up or the count leaving it out does not show:\n%s", f)
 	}
-
-	// On it nothing is selected to add or play, and enter goes up.
+	press(m, "j")
+	if e, ok := m.selectedEntry(); !ok || e.Name != "Album" {
+		t.Fatalf("below the way up is %q", e.Name)
+	}
+	if f := checkFrame(t, m, 100, 30); !strings.Contains(f, " 1/2 ") {
+		t.Errorf("the count of entries does not show:\n%s", f)
+	}
 	press(m, "k")
-	if _, ok := m.selectedEntry(); ok || !m.onParent() {
-		t.Fatal("the way up should select no entry")
-	}
-	if f := checkFrame(t, m, 100, 30); !strings.Contains(f, " –/2 ") {
-		t.Errorf("the count does not leave out the way up:\n%s", f)
-	}
 	press(m, "a")
 	if len(m.playlist) != 0 {
 		t.Fatalf("a on the way up added %d tracks", len(m.playlist))
@@ -58,6 +58,18 @@ func TestParentFolderEntry(t *testing.T) {
 	if e, _ := m.selectedEntry(); e.Name != "Artist" {
 		t.Fatalf("back on %q, want the folder it came from", e.Name)
 	}
+
+	// A folder left from an entry starts at the top again.
+	press(m, "enter")
+	press(m, "j")
+	press(m, "j") // Empty
+	press(m, "backspace")
+	press(m, "enter")
+	if !m.onParent() {
+		e, _ := m.selectedEntry()
+		t.Fatalf("back in Artist on %q, want the way up", e.Name)
+	}
+	press(m, "backspace")
 
 	// A filter matches entries only.
 	press(m, "enter")

@@ -40,7 +40,8 @@ func TestFramesFitWideCharacters(t *testing.T) {
 	for _, name := range []string{japanese, korean, emoji} {
 		m := newTestModel(t, tonesNamed(t, name+"/"+name+".wav"))
 		press(m, "enter") // into the folder
-		press(m, "enter") // plays the track
+		press(m, "down")  // the track
+		press(m, "enter") // plays it
 		if m.src == nil {
 			t.Fatalf("%+q is not loaded: %s", name, m.flash)
 		}

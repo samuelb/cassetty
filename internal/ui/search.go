@@ -72,7 +72,7 @@ func (m *Model) endSearch(filter string) {
 	m.search.on = false
 	m.filter = filter
 	m.refilter()
-	m.cursor = m.firstRow()
+	m.cursor = 0
 	for i, idx := range m.visible {
 		if m.entries[idx].Name == m.search.sel {
 			m.cursor = i

@@ -25,6 +25,7 @@ func TestUndoBringsThePlaylistBack(t *testing.T) {
 	}
 
 	press(m, "enter") // into A
+	press(m, "down")  // 01
 	press(m, "enter") // plays the album
 	album := []string{"01", "02", "03", "04"}
 	if !slices.Equal(listed(m), album) {

@@ -51,15 +51,6 @@ func (m *Model) parentShown() bool {
 // onParent reports whether the cursor is on the way to the folder above.
 func (m *Model) onParent() bool { return m.cursor == 0 && m.parentShown() }
 
-// firstRow is where the cursor goes in a list without a selection: on the
-// first entry rather than the way back, unless that is all there is.
-func (m *Model) firstRow() int {
-	if m.parentShown() && len(m.visible) > 1 {
-		return 1
-	}
-	return 0
-}
-
 func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 	if msg.refresh {
 		return m.applyRefresh(msg)
@@ -73,21 +64,16 @@ func (m *Model) applyDir(msg dirMsg) tea.Cmd {
 		return nil
 	}
 	m.endSearch("") // going to a folder ends the search
-	if m.dir != msg.dir {
-		if e, ok := m.selectedEntry(); ok {
-			m.memory[m.dir] = e.Name
-		}
-	}
 	m.dir, m.entries, m.dirErr = msg.dir, msg.entries, nil
 	m.filter, m.filtering = "", false
 	m.refilter()
-	focus := msg.focus
-	if focus == "" {
-		focus = m.memory[m.dir]
-	}
-	m.cursor, m.offset = m.firstRow(), 0
+	// The cursor starts at the top, on the way back if the folder has one,
+	// unless the load names an entry to focus, as going up does with the
+	// folder it came from. A folder does not keep where the cursor was when
+	// it was left.
+	m.cursor, m.offset = 0, 0
 	for i, idx := range m.visible {
-		if m.entries[idx].Name == focus {
+		if m.entries[idx].Name == msg.focus {
 			m.cursor = i
 		}
 	}

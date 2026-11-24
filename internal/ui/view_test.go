@@ -180,13 +180,15 @@ func TestNavigationAndPlayback(t *testing.T) {
 	m := newTestModel(t, root)
 	_, _ = m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
-	// Enter the first folder, keep entering until a file is selected.
+	// Enter the first folder, keep entering until a file is selected. Each
+	// folder below the root starts on the way up.
 	for i := 0; i < 5; i++ {
 		e, ok := m.selectedEntry()
 		if !ok || !e.IsDir {
 			break
 		}
 		press(m, "enter")
+		press(m, "down")
 	}
 	e, ok := m.selectedEntry()
 	if !ok || e.IsDir {

@@ -165,7 +165,6 @@ type Model struct {
 	visible   []int
 	cursor    int
 	offset    int
-	memory    map[string]string
 	filter    string
 	filtering bool
 	dirErr    error
@@ -217,7 +216,6 @@ func New(opts Options) *Model {
 		spectrum: viz.NewSpectrum(),
 		frames:   make([][2]float64, viz.FrameSize),
 		root:     filepath.Clean(opts.Root),
-		memory:   map[string]string{},
 		hoverRow: -1,
 	}
 	for k, v := range repeatNames {
