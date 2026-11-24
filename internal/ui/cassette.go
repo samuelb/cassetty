@@ -191,24 +191,126 @@ func (m *Model) renderCassette(w, h int) []string {
 	return lines
 }
 
-// quadrants maps a 2×2 coverage mask (TL=1, TR=2, BL=4, BR=8) to a glyph.
-var quadrants = []string{" ", "▘", "▝", "▀", "▖", "▌", "▞", "▛", "▗", "▚", "▐", "▜", "▄", "▙", "▟", "█"}
+// octants maps a 2×4 coverage mask to a block glyph. Bit n-1 stands for
+// octant n, the octants being numbered row by row: 1 2 / 3 4 / 5 6 / 7 8.
+// Unicode 16 has a BLOCK OCTANT character for every mask, in order of the
+// mask from U+1CD00, but for the 26 that older block characters draw.
+var octants = func() (g [256]string) {
+	oct := func(n ...int) (m int) {
+		for _, i := range n {
+			m |= 1 << (i - 1)
+		}
+		return m
+	}
+	older := map[int]rune{
+		0: ' ', 255: '█',
+		oct(1, 3): '▘', oct(2, 4): '▝', oct(5, 7): '▖', oct(6, 8): '▗',
+		oct(1, 2, 3, 4): '▀', oct(5, 6, 7, 8): '▄', oct(1, 3, 5, 7): '▌', oct(2, 4, 6, 8): '▐',
+		oct(2, 4, 5, 7): '▞', oct(1, 3, 6, 8): '▚',
+		oct(1, 2, 3, 4, 5, 7): '▛', oct(1, 2, 3, 4, 6, 8): '▜', oct(1, 3, 5, 6, 7, 8): '▙', oct(2, 4, 5, 6, 7, 8): '▟',
+		oct(1, 2): '\U0001FB82', oct(7, 8): '▂', oct(1, 2, 3, 4, 5, 6): '\U0001FB85', oct(3, 4, 5, 6, 7, 8): '▆',
+		oct(1): '\U0001CEA8', oct(2): '\U0001CEAB', oct(7): '\U0001CEA3', oct(8): '\U0001CEA0',
+		oct(3, 5): '\U0001FBE6', oct(4, 6): '\U0001FBE7',
+	}
+	next := rune(0x1CD00)
+	for m := range g {
+		r, ok := older[m]
+		if !ok {
+			r = next
+			next++
+		}
+		g[m] = string(r)
+	}
+	return g
+}()
 
-// reelWindow renders the cassette window: the tape packs are solid discs
-// drawn with quadrant blocks (2×2 sub-cells, two colors) and the rotating
-// hubs are drawn on top in braille for the finer detail. All geometry is in
-// braille dot space, where dots are roughly square.
-func (m *Model) reelWindow(cols, rows int) []string {
-	t := m.theme
+// reels is where the reels lie in a window, in braille dot space.
+type reels struct {
+	cxL, cxR, cy float64 // centres
+	hubR         float64
+	hole         float64 // radius of the spindle hole
+	rMin, rMax   float64 // radius of an empty and a full pack
+}
+
+// reelGeometry lays out the reels in a window of cols×rows cells. Each
+// cell holds 2×4 dots, and the reels turn about the middle of four dots,
+// so that every round thing about them is drawn symmetric:
+//
+//   - The hub is drawn in braille, on the tape: a braille cell has but one
+//     color behind its dots, and the tape of an empty reel is just enough
+//     to fill the cells of the hub's ring, so that the edge of the pack is
+//     always drawn in octants, and round.
+//   - The spindle hole in the middle of the hub is a disc of the dots whose
+//     centres lie within a circle an even number of dots across: as round
+//     as dots make a disc. It is drawn in octants as well, in the cells it
+//     reaches into, which the hub leaves.
+//
+// The middle of a window an odd number of rows high, as it is, lies in the
+// middle of four dots already. Across, a reel turns about the middle of a
+// cell or the line between two cells, whichever lets the cells of its
+// ring reach the least beyond it, a dot at most from a quarter of the
+// width; the right reel mirrors the left.
+func reelGeometry(cols, rows int) reels {
 	dw, dh := float64(cols*2), float64(rows*4)
-	cy := (dh - 1) / 2
-	cxL, cxR := (dw-1)*0.25, (dw-1)*0.75
-	hubR := hubRadius(dh)
-	rMin := hubR + 0.8
+	g := reels{hubR: hubRadius(rows), cy: (dh - 1) / 2}
+	g.hole = math.Max(1, math.Round(g.hubR*0.3))
+	q := (dw - 1) * 0.25
+	reach := math.Inf(1)
+	for _, cx := range []float64{2*math.Round((q-0.5)/2) + 0.5, 2*math.Round((q+0.5)/2) - 0.5} {
+		if rr := ringReach(cx, g.cy, g.hubR); rr < reach || rr == reach && math.Abs(cx-q) < math.Abs(g.cxL-q) {
+			reach, g.cxL = rr, cx
+		}
+	}
+	g.cxR = dw - 1 - g.cxL
+	g.rMin = unNubbed(reach)
 	// A full pack fills the height of the window, and in a low window it is
 	// wider than that and cut off above and below, as it is by the window of
 	// a real cassette: the hub leaves too little room for it otherwise.
-	rMax := math.Min(math.Max(dh/2+0.4, hubR+4.3), (cxR-cxL)-rMin-1.5)
+	g.rMax = unNubbed(math.Min(math.Max(dh/2+0.4, g.hubR+4.3), (g.cxR-g.cxL)-g.rMin-1.5))
+	return g
+}
+
+// ringReach returns how far from cx, cy the farthest dot lies of the cells
+// that hold the ring of a hub of radius r.
+func ringReach(cx, cy, r float64) float64 {
+	reach := 0.0
+	for y := math.Floor(cy - r - 1); y <= cy+r+1; y++ {
+		for x := math.Floor(cx - r - 1); x <= cx+r+1; x++ {
+			if !onRing(math.Hypot(x-cx, y-cy), r) {
+				continue
+			}
+			x0, y0 := 2*math.Floor(x/2), 4*math.Floor(y/4) // the cell's first dot
+			for _, c := range [4][2]float64{{0, 0}, {1, 0}, {0, 3}, {1, 3}} {
+				reach = math.Max(reach, math.Hypot(x0+c[0]-cx, y0+c[1]-cy))
+			}
+		}
+	}
+	return reach
+}
+
+// unNubbed returns the radius r, or a little more, such that the disc of
+// the dots around the middle of four dots does not end in a nub: a row of
+// two dots at the top, bottom and sides, as it does when r just reaches
+// another row. A pack that grows or shrinks passes through such radii; an
+// empty or a full one does not stay at one.
+func unNubbed(r float64) float64 {
+	a := math.Floor(math.Sqrt(r*r-0.25)-0.5) + 0.5 // the outermost row reached
+	if r < math.Hypot(a, 1.5) {                    // with two dots only
+		return math.Hypot(a, 1.5)
+	}
+	return r
+}
+
+// reelWindow renders the cassette window: the tape packs are solid discs
+// drawn with octant blocks (2×4 sub-cells, two colors) and the rotating
+// hubs are drawn on top in braille for the finer detail. All geometry is in
+// braille dot space, where dots are roughly square; an octant is one dot.
+func (m *Model) reelWindow(cols, rows int) []string {
+	t := m.theme
+	dw, dh := float64(cols*2), float64(rows*4)
+	g := reelGeometry(cols, rows)
+	cxL, cxR, cy, hubR, hole := g.cxL, g.cxR, g.cy, g.hubR, g.hole
+	rMin, rMax := g.rMin, g.rMax
 	// Tape length is proportional to the pack's area, so the radius follows
 	// the square root of the remaining fraction.
 	p := m.progress()
@@ -234,22 +336,16 @@ func (m *Model) reelWindow(cols, rows int) []string {
 	tangent(cxL, rL, 0, dh-1, 1)
 	tangent(cxR, rR, dw-1, dh-1, -1)
 
-	inPack := func(x, y float64) bool {
-		dl := math.Hypot(x-cxL, y-cy)
-		dr := math.Hypot(x-cxR, y-cy)
-		return (dl > hubR && dl <= rL) || (dr > hubR && dr <= rR)
+	// The tape color runs into the hub up to the spindle hole.
+	inHole := func(x, y float64) bool {
+		return math.Hypot(x-cxL, y-cy) <= hole || math.Hypot(x-cxR, y-cy) <= hole
 	}
-	// Hub cells take the tape color as background unless they are part of
-	// the centre hole, so the hub reads as a ring set into the pack.
-	onTape := func(x, y float64) bool {
-		dl := math.Hypot(x-cxL, y-cy)
-		dr := math.Hypot(x-cxR, y-cy)
-		return (dl > hubR*0.38 && dl <= rL) || (dr > hubR*0.38 && dr <= rR)
+	inPack := func(x, y float64) bool {
+		return !inHole(x, y) && (math.Hypot(x-cxL, y-cy) <= rL || math.Hypot(x-cxR, y-cy) <= rR)
 	}
 
 	pack := fgbg(t.Tape, t.WindowBg)
-	hub := fgbg(t.Hub, t.WindowBg)
-	hubOnTape := fgbg(t.Hub, t.Tape)
+	hub := fgbg(t.Hub, t.Tape)
 	out := make([]string, rows)
 	for y := 0; y < rows; y++ {
 		var sb strings.Builder
@@ -267,25 +363,25 @@ func (m *Model) reelWindow(cols, rows int) []string {
 		}
 		for x := 0; x < cols; x++ {
 			fx, fy := float64(2*x), float64(4*y)
-			if mask := hubs.mask[y*cols+x]; mask != 0 {
-				st := &hub
-				if onTape(fx+0.5, fy+1.5) {
-					st = &hubOnTape
-				}
-				emit(st, string(rune(0x2800+int(mask))))
-				continue
-			}
-			q := 0
-			for i, pt := range [4][2]float64{{0, 0.5}, {1, 0.5}, {0, 2.5}, {1, 2.5}} {
-				if inPack(fx+pt[0], fy+pt[1]) {
+			q, holed := 0, false
+			for i := range 8 {
+				dx, dy := fx+float64(i%2), fy+float64(i/2)
+				if inPack(dx, dy) {
 					q |= 1 << i
 				}
+				holed = holed || inHole(dx, dy)
+			}
+			// The hub lies on the tape, and leaves the cells the spindle
+			// hole reaches into, see reelGeometry.
+			if mask := hubs.mask[y*cols+x]; mask != 0 && !holed {
+				emit(&hub, string(rune(0x2800+int(mask))))
+				continue
 			}
 			if mask := strands.mask[y*cols+x]; q == 0 && mask != 0 {
 				emit(&pack, string(rune(0x2800+int(mask))))
 				continue
 			}
-			emit(&pack, quadrants[q])
+			emit(&pack, octants[q])
 		}
 		if run.Len() > 0 {
 			sb.WriteString(cur.Render(run.String()))
@@ -295,11 +391,25 @@ func (m *Model) reelWindow(cols, rows int) []string {
 	return out
 }
 
-// hubRadius is the radius of a reel hub in a window dh dots high. A low
-// window gets a hub that is larger for its height: below some four dots of
-// radius there is no telling that it turns.
-func hubRadius(dh float64) float64 {
-	return math.Max(3.7, dh*0.24)
+// hubRadius is the radius of a reel hub in a window rows cells high. In
+// the low windows the hub is larger for the height: below some four dots
+// of radius there is no telling that it turns. The radii keep the cells of
+// the hub's ring from reaching far beyond it, see reelGeometry: in a window
+// of seven rows its outermost dots are the outermost of their cells.
+func hubRadius(rows int) float64 {
+	switch {
+	case rows >= 7:
+		return 5.5
+	case rows >= 5:
+		return 4.5
+	}
+	return 3.7
+}
+
+// onRing reports whether a dot d from the centre of a hub of radius r is
+// on its ring.
+func onRing(d, r float64) bool {
+	return d >= r-0.6 && d <= r+0.45
 }
 
 // drawHub draws a reel hub: a ring with spokes around the spindle hole. A
@@ -325,7 +435,7 @@ func drawHub(cv *canvas, cx, cy, r, angle float64) {
 			if d > r+0.45 {
 				continue
 			}
-			on := d >= r-0.6
+			on := onRing(d, r)
 			for _, s := range dirs {
 				if on {
 					break
