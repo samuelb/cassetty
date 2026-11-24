@@ -59,9 +59,13 @@ Sleep 300ms
 Down
 Sleep 700ms
 Enter
-Sleep 700ms
+Sleep 600ms
+Down
+Sleep 300ms
 Enter
-Sleep 900ms
+Sleep 600ms
+Down
+Sleep 400ms
 Enter
 Sleep 3.5s
 Type "]"
