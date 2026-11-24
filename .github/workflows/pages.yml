@@ -29,6 +29,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # Cloudflare lets browsers keep site.js and site.css for hours but the
+      # page for only minutes, so after a deploy a browser could pair the new
+      # page with the old script. A content hash in the URL makes every
+      # change a new file.
+      - name: Stamp asset URLs with their content hash
+        run: |
+          for f in site.css site.js; do
+            hash=$(sha256sum "docs/$f" | cut -c1-10)
+            grep -q "\"$f\"" docs/index.html || { echo "::error::docs/index.html does not reference $f"; exit 1; }
+            sed -i "s|\"$f\"|\"$f?v=$hash\"|g" docs/index.html
+          done
+          grep -nE 'site\.(css|js)\?v=' docs/index.html
+
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: docs
